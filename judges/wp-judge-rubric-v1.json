@@ -1,0 +1,163 @@
+{
+  "id": "wp-judge-rubric-v1",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "WordPress Code Quality Rubric",
+    "description": "Evaluation criteria for WordPress PHP code quality assessment"
+  },
+  "system_prompt": "You are an expert WordPress developer and code reviewer acting as a judge for AI-generated code. Your task is to objectively evaluate code quality based on specific criteria. Be fair, consistent, and provide specific examples from the code to justify your scores. Always respond with valid JSON matching the required schema.",
+  "evaluation_prompt_template": "## Code Evaluation Task\n\nYou are evaluating AI-generated WordPress code.\n\n### Original Task\n{{task}}\n\n### Requirements\n{{requirements}}\n\n### Generated Code\n```php\n{{code}}\n```\n{{context}}\n\n### Evaluation Criteria\n{{criteria}}\n\n### Instructions\nEvaluate the code above against each criterion. For each criterion:\n1. Assign a score from 0-5 based on the scoring guide\n2. Provide specific reasoning citing code examples\n\nThen provide:\n- An overall weighted score (0-5)\n- A brief summary of the code quality\n- List of issues found (if any)\n- List of strengths (if any)\n\nIMPORTANT: Respond with valid JSON only. Do not include any text outside the JSON object.",
+  "criteria": [
+    {
+      "id": "security",
+      "name": "Security",
+      "description": "Proper handling of user input, output escaping, nonce verification, and capability checks where applicable",
+      "weight": 0.30,
+      "scoring_guide": {
+        "0": "Critical security vulnerabilities present (SQL injection, XSS, unescaped output of user data)",
+        "1": "Major security issues (missing escaping in multiple places, direct superglobal usage without sanitization)",
+        "2": "Some security concerns (inconsistent escaping, missing capability checks where needed)",
+        "3": "Adequate security (escaping present but not comprehensive, basic input handling)",
+        "4": "Good security (proper escaping and sanitization, basic capability checks)",
+        "5": "Excellent security (comprehensive escaping, sanitization, nonces and capability checks where appropriate)"
+      }
+    },
+    {
+      "id": "performance",
+      "name": "Performance",
+      "description": "Efficient database queries, appropriate caching, avoiding unnecessary operations",
+      "weight": 0.20,
+      "scoring_guide": {
+        "0": "Severe performance issues (queries in loops, N+1 problems, unbounded data fetching)",
+        "1": "Major inefficiencies (repeated database calls, no pagination on large datasets)",
+        "2": "Some performance concerns (suboptimal queries, could benefit from caching)",
+        "3": "Acceptable performance (reasonable queries, basic optimization present)",
+        "4": "Good performance (efficient queries, appropriate use of WordPress APIs)",
+        "5": "Excellent performance (optimal queries, caching consideration, minimal database calls)"
+      }
+    },
+    {
+      "id": "conventions",
+      "name": "WordPress Conventions",
+      "description": "Adherence to WordPress coding standards, proper use of APIs, hooks, and best practices",
+      "weight": 0.25,
+      "scoring_guide": {
+        "0": "Ignores WordPress conventions entirely (raw PHP/SQL instead of WordPress APIs)",
+        "1": "Major convention violations (bypasses WordPress functions, incorrect hook usage)",
+        "2": "Some convention issues (inconsistent naming, partial use of appropriate APIs)",
+        "3": "Mostly follows conventions (correct API usage with minor style issues)",
+        "4": "Good convention adherence (proper hooks, functions, and naming conventions)",
+        "5": "Excellent conventions (follows WordPress Coding Standards, optimal API usage, proper hook patterns)"
+      }
+    },
+    {
+      "id": "readability",
+      "name": "Code Readability",
+      "description": "Clear variable names, logical structure, appropriate comments where needed",
+      "weight": 0.15,
+      "scoring_guide": {
+        "0": "Unreadable code (cryptic variable names, no logical structure)",
+        "1": "Very poor readability (single-letter variables, confusing logic flow)",
+        "2": "Hard to read (unclear naming, inconsistent formatting)",
+        "3": "Acceptable readability (reasonable names, basic structure)",
+        "4": "Good readability (clear names, logical flow, well-organized)",
+        "5": "Excellent readability (self-documenting code, clear structure, helpful comments where needed)"
+      }
+    },
+    {
+      "id": "correctness",
+      "name": "Functional Correctness",
+      "description": "Whether the code correctly implements the required functionality",
+      "weight": 0.10,
+      "scoring_guide": {
+        "0": "Does not work at all or completely wrong approach",
+        "1": "Mostly broken with major functional issues",
+        "2": "Partially works but missing key requirements",
+        "3": "Works for basic cases but edge cases not handled",
+        "4": "Works correctly for most scenarios",
+        "5": "Fully correct implementation handling all stated requirements"
+      }
+    }
+  ],
+  "response_schema": {
+    "type": "object",
+    "required": ["overall_score", "criteria_scores", "summary"],
+    "properties": {
+      "overall_score": {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 5,
+        "description": "Weighted average of all criteria scores"
+      },
+      "criteria_scores": {
+        "type": "object",
+        "required": ["security", "performance", "conventions", "readability", "correctness"],
+        "properties": {
+          "security": {
+            "type": "object",
+            "required": ["score", "reasoning"],
+            "properties": {
+              "score": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "reasoning": { "type": "string" }
+            }
+          },
+          "performance": {
+            "type": "object",
+            "required": ["score", "reasoning"],
+            "properties": {
+              "score": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "reasoning": { "type": "string" }
+            }
+          },
+          "conventions": {
+            "type": "object",
+            "required": ["score", "reasoning"],
+            "properties": {
+              "score": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "reasoning": { "type": "string" }
+            }
+          },
+          "readability": {
+            "type": "object",
+            "required": ["score", "reasoning"],
+            "properties": {
+              "score": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "reasoning": { "type": "string" }
+            }
+          },
+          "correctness": {
+            "type": "object",
+            "required": ["score", "reasoning"],
+            "properties": {
+              "score": { "type": "integer", "minimum": 0, "maximum": 5 },
+              "reasoning": { "type": "string" }
+            }
+          }
+        }
+      },
+      "summary": {
+        "type": "string",
+        "description": "2-3 sentence overall assessment of the code quality"
+      },
+      "issues": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "severity": {
+              "type": "string",
+              "enum": ["critical", "major", "minor"]
+            },
+            "category": { "type": "string" },
+            "description": { "type": "string" },
+            "line_reference": { "type": "string" }
+          }
+        }
+      },
+      "strengths": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    }
+  }
+}

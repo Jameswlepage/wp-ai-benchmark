@@ -1,0 +1,50 @@
+{
+	"name": "wordpress/wp-ai-benchmarks",
+	"description": "Benchmark LLM performance on WordPress-specific knowledge and code generation tasks",
+	"type": "wordpress-plugin",
+	"license": "GPL-2.0-or-later",
+	"authors": [
+		{
+			"name": "WordPress Community"
+		}
+	],
+	"repositories": [
+		{
+			"type": "vcs",
+			"url": "https://github.com/WordPress/wp-ai-client.git"
+		}
+	],
+	"require": {
+		"php": ">=8.4",
+		"wordpress/wp-ai-client": "0.2.1"
+	},
+	"require-dev": {
+		"dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+		"php-stubs/wp-cli-stubs": "^2.12",
+		"phpcompatibility/phpcompatibility-wp": "^2.1",
+		"phpstan/phpstan": "^1.10",
+		"szepeviktor/phpstan-wordpress": "^1.3",
+		"wp-coding-standards/wpcs": "^3.0"
+	},
+	"autoload": {
+		"psr-4": {
+			"WP_AI_Benchmarks\\": "inc/",
+			"WP_AI_Benchmarks\\CLI\\": "cli/"
+		}
+	},
+	"scripts": {
+		"lint": "phpcs",
+		"lint:fix": "phpcbf",
+		"phpstan": "phpstan analyse",
+		"test": [
+			"@lint",
+			"@phpstan"
+		]
+	},
+	"config": {
+		"allow-plugins": {
+			"dealerdirect/phpcodesniffer-composer-installer": true
+		},
+		"sort-packages": true
+	}
+}

@@ -1,0 +1,317 @@
+{
+  "id": "wp-core-execution-v1",
+  "version": "1.0.0",
+  "metadata": {
+    "name": "WordPress Core Execution Tests",
+    "description": "Code generation tasks for WordPress development including shortcodes, queries, and hooks",
+    "wp_version": "6.9",
+    "created_at": "2025-01-01"
+  },
+  "tests": [
+    {
+      "id": "e-shortcode-001",
+      "category": "shortcodes",
+      "difficulty": "basic",
+      "prompt": "Create a WordPress shortcode called 'greeting' that accepts a 'name' attribute and outputs 'Hello, {name}!' where {name} is the attribute value. If no name is provided, default to 'World'.",
+      "expected_behavior": "A shortcode [greeting name=\"Alice\"] outputs 'Hello, Alice!' and [greeting] outputs 'Hello, World!'",
+      "requirements": [
+        "Register a shortcode with the tag 'greeting'",
+        "Accept a 'name' attribute with default value 'World'",
+        "Output must be properly escaped using esc_html()",
+        "Return the greeting string, do not echo"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          {
+            "pattern": "add_shortcode\\s*\\(\\s*['\"]greeting['\"]",
+            "description": "Must register shortcode with tag 'greeting'",
+            "weight": 1.0
+          },
+          {
+            "pattern": "esc_html|esc_attr|wp_kses",
+            "description": "Must use WordPress escaping",
+            "weight": 0.5
+          },
+          {
+            "pattern": "shortcode_atts",
+            "description": "Should use shortcode_atts for attribute defaults",
+            "weight": 0.5
+          }
+        ],
+        "forbidden_patterns": [
+          {
+            "pattern": "\\becho\\b",
+            "description": "Should return, not echo",
+            "severity": "warning"
+          }
+        ]
+      },
+      "runtime_checks": {
+        "setup": "",
+        "assertions": [
+          {
+            "type": "shortcode_exists",
+            "target": "greeting",
+            "description": "Shortcode must be registered",
+            "weight": 1.0
+          },
+          {
+            "type": "output_equals",
+            "target": "echo do_shortcode('[greeting name=\"Alice\"]');",
+            "expected": "Hello, Alice!",
+            "description": "Shortcode with name attribute",
+            "weight": 1.0
+          },
+          {
+            "type": "output_equals",
+            "target": "echo do_shortcode('[greeting]');",
+            "expected": "Hello, World!",
+            "description": "Shortcode with default name",
+            "weight": 1.0
+          }
+        ],
+        "teardown": "remove_shortcode('greeting');"
+      },
+      "judge_config": {
+        "rubric_id": "wp-judge-rubric-v1"
+      },
+      "reference_solution": "function greeting_shortcode( $atts ) {\n    $atts = shortcode_atts( array( 'name' => 'World' ), $atts, 'greeting' );\n    return 'Hello, ' . esc_html( $atts['name'] ) . '!';\n}\nadd_shortcode( 'greeting', 'greeting_shortcode' );"
+    },
+    {
+      "id": "e-wpquery-001",
+      "category": "wp_query",
+      "difficulty": "intermediate",
+      "prompt": "Write a function called 'get_recent_news_posts' that returns the 5 most recently published posts from the 'news' category. The function should return an array of post objects.",
+      "expected_behavior": "Function returns up to 5 published posts from the 'news' category, ordered by date descending",
+      "requirements": [
+        "Use WP_Query for the database query",
+        "Filter to 'post' post type",
+        "Filter to 'publish' status only",
+        "Filter to 'news' category by slug",
+        "Limit to 5 posts",
+        "Order by date descending",
+        "Return array of post objects",
+        "Reset post data after query using wp_reset_postdata()"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          {
+            "pattern": "new\\s+WP_Query",
+            "description": "Must use WP_Query class",
+            "weight": 1.0
+          },
+          {
+            "pattern": "posts_per_page",
+            "description": "Must specify posts_per_page",
+            "weight": 0.5
+          },
+          {
+            "pattern": "category_name|cat\\s*=>",
+            "description": "Must filter by category",
+            "weight": 0.5
+          },
+          {
+            "pattern": "wp_reset_postdata",
+            "description": "Should reset post data after query",
+            "weight": 0.3
+          }
+        ],
+        "forbidden_patterns": [
+          {
+            "pattern": "\\$wpdb->",
+            "description": "Should use WP_Query, not direct database queries",
+            "severity": "warning"
+          }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "function_exists",
+            "target": "get_recent_news_posts",
+            "description": "Function must exist",
+            "weight": 1.0
+          },
+          {
+            "type": "custom_assertion",
+            "code": "$result = get_recent_news_posts(); return is_array($result);",
+            "description": "Must return an array",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": {
+        "rubric_id": "wp-judge-rubric-v1",
+        "context_for_judge": "This function will be used in a theme to display recent news posts on the homepage. Consider query efficiency and proper WordPress patterns."
+      }
+    },
+    {
+      "id": "e-hooks-001",
+      "category": "hooks",
+      "difficulty": "intermediate",
+      "prompt": "Create code that adds a custom column called 'Featured' to the Posts admin list table. The column should display 'Yes' if the post has a meta key '_is_featured' with value '1', otherwise display 'No'.",
+      "expected_behavior": "Admin posts list shows a 'Featured' column with Yes/No values based on post meta",
+      "requirements": [
+        "Add column header using 'manage_posts_columns' filter",
+        "Populate column content using 'manage_posts_custom_column' action",
+        "Check post meta '_is_featured' for value '1'",
+        "Display 'Yes' or 'No' appropriately",
+        "Escape all output"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          {
+            "pattern": "add_filter.*manage_posts_columns",
+            "description": "Must hook into manage_posts_columns",
+            "weight": 1.0
+          },
+          {
+            "pattern": "add_action.*manage_posts_custom_column",
+            "description": "Must hook into manage_posts_custom_column",
+            "weight": 1.0
+          },
+          {
+            "pattern": "get_post_meta",
+            "description": "Must use get_post_meta to check meta value",
+            "weight": 0.5
+          },
+          {
+            "pattern": "_is_featured",
+            "description": "Must reference the correct meta key",
+            "weight": 0.5
+          }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "hook_registered",
+            "target": "manage_posts_columns",
+            "description": "Column filter must be registered",
+            "weight": 1.0
+          },
+          {
+            "type": "hook_registered",
+            "target": "manage_posts_custom_column",
+            "description": "Column action must be registered",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": {
+        "rubric_id": "wp-judge-rubric-v1"
+      }
+    },
+    {
+      "id": "e-rest-001",
+      "category": "rest_api",
+      "difficulty": "intermediate",
+      "prompt": "Create a REST API endpoint at '/wp-json/myplugin/v1/status' that returns a JSON object with a 'status' key set to 'ok' and a 'timestamp' key with the current Unix timestamp. The endpoint should be publicly accessible without authentication.",
+      "expected_behavior": "GET request to /wp-json/myplugin/v1/status returns {\"status\": \"ok\", \"timestamp\": <unix_timestamp>}",
+      "requirements": [
+        "Use register_rest_route() to register the endpoint",
+        "Use namespace 'myplugin/v1'",
+        "Route should be 'status'",
+        "Accept GET requests",
+        "Return WP_REST_Response with status and timestamp",
+        "Endpoint should be publicly accessible (permission_callback returns true)"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          {
+            "pattern": "register_rest_route",
+            "description": "Must use register_rest_route()",
+            "weight": 1.0
+          },
+          {
+            "pattern": "myplugin/v1",
+            "description": "Must use correct namespace",
+            "weight": 0.5
+          },
+          {
+            "pattern": "permission_callback",
+            "description": "Must include permission_callback",
+            "weight": 0.5
+          },
+          {
+            "pattern": "WP_REST_Response|rest_ensure_response",
+            "description": "Should return proper REST response",
+            "weight": 0.3
+          }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "hook_registered",
+            "target": "rest_api_init",
+            "description": "REST route registration hook must be used",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": {
+        "rubric_id": "wp-judge-rubric-v1",
+        "context_for_judge": "This is a simple status endpoint for a health check. Security is important - ensure permission_callback is properly defined."
+      }
+    },
+    {
+      "id": "e-meta-001",
+      "category": "post_meta",
+      "difficulty": "basic",
+      "prompt": "Write a function called 'save_view_count' that takes a post ID and increments a post meta value '_view_count' by 1. If the meta doesn't exist, initialize it to 1. The function should return the new view count.",
+      "expected_behavior": "Calling save_view_count(123) increments _view_count meta for post 123 and returns the new count",
+      "requirements": [
+        "Accept post ID as parameter",
+        "Get current _view_count meta value",
+        "If meta doesn't exist, treat as 0",
+        "Increment by 1 and save using update_post_meta()",
+        "Return the new count as an integer"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          {
+            "pattern": "function\\s+save_view_count",
+            "description": "Must define function save_view_count",
+            "weight": 1.0
+          },
+          {
+            "pattern": "get_post_meta",
+            "description": "Must use get_post_meta to read current value",
+            "weight": 0.5
+          },
+          {
+            "pattern": "update_post_meta",
+            "description": "Must use update_post_meta to save value",
+            "weight": 0.5
+          },
+          {
+            "pattern": "_view_count",
+            "description": "Must use correct meta key",
+            "weight": 0.5
+          }
+        ],
+        "forbidden_patterns": [
+          {
+            "pattern": "\\$wpdb->",
+            "description": "Should use WordPress meta functions, not direct queries",
+            "severity": "warning"
+          }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "function_exists",
+            "target": "save_view_count",
+            "description": "Function must exist",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": {
+        "rubric_id": "wp-judge-rubric-v1"
+      }
+    }
+  ]
+}

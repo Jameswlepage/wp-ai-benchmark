@@ -1,0 +1,28 @@
+includes:
+    - vendor/szepeviktor/phpstan-wordpress/extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - wp-ai-benchmarks.php
+        - inc
+        - cli
+    excludePaths:
+        - vendor
+    scanDirectories:
+        - vendor/wordpress/wp-ai-client
+    bootstrapFiles:
+        - vendor/php-stubs/wp-cli-stubs/wp-cli-stubs.php
+        - phpstan-bootstrap.php
+    ignoreErrors:
+        # Unused code is fine for a framework-style plugin
+        - '#Property .+ is never read, only written#'
+        - '#Constant .+ is unused#'
+        # These ?? are defensive and fine
+        - '#on left side of \?\? always exists and is not nullable#'
+        # Unreachable after WP_CLI::error() is fine - it exits
+        - '#Unreachable statement - code above always terminates#'
+        # set_error_handler with null-returning closure is intentional
+        - '#Parameter \#1 \$callback of function set_error_handler expects#'
+        # Shutdown handler sets this property asynchronously
+        - '#Strict comparison using !== between null and null will always evaluate to false#'
