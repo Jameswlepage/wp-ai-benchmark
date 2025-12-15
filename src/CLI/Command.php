@@ -6,7 +6,8 @@
  *
  * @phpstan-type BenchmarkScores array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float}
  * @phpstan-type BenchmarkMetadata array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int}
- * @phpstan-type CategoryScore array{score: float, count: int}
+ * @phpstan-type CategoryTypeScore array{score: float, count: int}
+ * @phpstan-type CategoryScore array{knowledge: CategoryTypeScore, execution: CategoryTypeScore, total: CategoryTypeScore}
  * @phpstan-type BenchmarkResults array{suite: string, model: string, judge_model: string, runs: int, scores: BenchmarkScores, category_scores: array<string, CategoryScore>, metadata: BenchmarkMetadata, test_results: array<\WordPress\AI_Benchmark\Test_Result>}
  */
 
@@ -83,6 +84,9 @@ class Command {
 	 * [--skip-judge]
 	 * : Skip AI judge evaluation (faster, but no quality scores).
 	 *
+	 * [--concurrency=<n>]
+	 * : Number of parallel test workers. Default: 5.
+	 *
 	 * ## EXAMPLES
 	 *
 	 *     wp ai-bench run --suite=wp-core-v1 --model=openai:gpt-4.1
@@ -104,6 +108,7 @@ class Command {
 		$verbose     = Utils\get_flag_value( $assoc_args, 'verbose', false );
 		$format      = $assoc_args['format'] ?? 'table';
 		$skip_judge  = Utils\get_flag_value( $assoc_args, 'skip-judge', false );
+		$concurrency = (int) ( $assoc_args['concurrency'] ?? 5 );
 
 		// Validate required arguments.
 		if ( ! $suite || ! $model ) {
@@ -113,6 +118,11 @@ class Command {
 		// Validate runs.
 		if ( $runs < 1 ) {
 			WP_CLI::error( '--runs must be at least 1' );
+		}
+
+		// Validate concurrency.
+		if ( $concurrency < 1 ) {
+			WP_CLI::error( '--concurrency must be at least 1' );
 		}
 
 		// Check model availability.
@@ -137,6 +147,7 @@ class Command {
 		WP_CLI::log( sprintf( '  Model: %s', $model ) );
 		WP_CLI::log( sprintf( '  Judge: %s', $skip_judge ? '(skipped)' : $judge_model ) );
 		WP_CLI::log( sprintf( '  Runs: %d', $runs ) );
+		WP_CLI::log( sprintf( '  Concurrency: %d', $concurrency ) );
 		WP_CLI::log( '' );
 
 		$runner = new Runner(
@@ -178,6 +189,7 @@ class Command {
 				judge_model: $judge_model,
 				runs: $runs,
 				progress_callback: $progress_callback,
+				concurrency: $concurrency,
 			);
 
 			if ( $format === 'json' ) {
@@ -282,18 +294,34 @@ class Command {
 		);
 
 		try {
-			WP_CLI::log( sprintf( 'Running test: %s', $test_id ) );
-			WP_CLI::log( sprintf( 'Model: %s', $model ) );
-			WP_CLI::log( '' );
+			// Only show header for non-JSON output.
+			if ( 'json' !== $format ) {
+				WP_CLI::log( sprintf( 'Running test: %s', $test_id ) );
+				WP_CLI::log( sprintf( 'Model: %s', $model ) );
+				WP_CLI::log( '' );
+			}
 
 			$result = $runner->run_single_test( $test_id, $model, $judge_model );
 
-			if ( $format === 'json' ) {
-				WP_CLI::log( wp_json_encode( $result->to_array(), JSON_PRETTY_PRINT ) );
+			if ( 'json' === $format ) {
+				// Output only JSON for machine parsing (used by parallel runner).
+				WP_CLI::line( wp_json_encode( $result->to_array() ) );
 			} else {
 				$this->display_single_result_detailed( $result );
 			}
 		} catch ( \Throwable $e ) {
+			if ( 'json' === $format ) {
+				// Output error as JSON for machine parsing.
+				WP_CLI::line(
+					wp_json_encode(
+						[
+							'test_id' => $test_id,
+							'error'   => $e->getMessage(),
+						]
+					)
+				);
+				exit( 1 );
+			}
 			WP_CLI::error( 'Test failed: ' . $e->getMessage() );
 		}
 	}
@@ -382,30 +410,42 @@ class Command {
 		);
 		WP_CLI::log( '' );
 
-		// Main scores.
+		// Scores table with category breakdown.
 		WP_CLI::log( 'SCORES:' );
-		WP_CLI::log( sprintf( '  Knowledge Score:            %.4f', $results['scores']['knowledge'] ) );
-		WP_CLI::log( sprintf( '  Execution Correctness:      %.4f', $results['scores']['execution_correctness'] ) );
-		WP_CLI::log( sprintf( '  Execution Quality:          %.4f', $results['scores']['execution_quality'] ) );
-		WP_CLI::log( '  ----------------------------------------' );
-		WP_CLI::log( sprintf( '  OVERALL SCORE:              %.4f', $results['scores']['overall'] ) );
 		WP_CLI::log( '' );
+		WP_CLI::log( sprintf( '  %-16s %14s %14s %14s', 'Category', 'Knowledge', 'Execution', 'Total' ) );
+		WP_CLI::log( '  ' . str_repeat( '-', 60 ) );
 
-		// Category breakdown.
 		if ( ! empty( $results['category_scores'] ) ) {
-			WP_CLI::log( 'CATEGORY BREAKDOWN:' );
 			foreach ( $results['category_scores'] as $category => $data ) {
+				$knowledge_str = $this->format_category_score( $data['knowledge'] );
+				$execution_str = $this->format_category_score( $data['execution'] );
+				$total_str     = $this->format_category_score( $data['total'] );
+
 				WP_CLI::log(
 					sprintf(
-						'  %-20s %.4f (%d tests)',
-						$category . ':',
-						$data['score'],
-						$data['count']
+						'  %-16s %14s %14s %14s',
+						$category,
+						$knowledge_str,
+						$execution_str,
+						$total_str
 					)
 				);
 			}
-			WP_CLI::log( '' );
 		}
+
+		// Totals row.
+		WP_CLI::log( '' );
+		WP_CLI::log(
+			sprintf(
+				'  %-16s %14s %14s %14s',
+				'TOTAL',
+				sprintf( '%.2f (%d)', $results['scores']['knowledge'], $results['metadata']['knowledge_tests'] ),
+				sprintf( '%.2f (%d)', $results['scores']['execution_correctness'], $results['metadata']['execution_tests'] ),
+				sprintf( '%.2f (%d)', $results['scores']['overall'], $results['metadata']['total_tests'] )
+			)
+		);
+		WP_CLI::log( '' );
 
 		// Verbose per-test results.
 		if ( $verbose ) {
@@ -513,5 +553,20 @@ class Command {
 				WP_CLI::log( wp_json_encode( $data['judge_details'], JSON_PRETTY_PRINT ) );
 			}
 		}
+	}
+
+	/**
+	 * Format a category score for table display.
+	 *
+	 * @param array{score: float, count: int} $data Score data with score and count.
+	 *
+	 * @return string Formatted string like "0.85 (3)" or "-" if no tests.
+	 */
+	private function format_category_score( array $data ): string {
+		if ( 0 === $data['count'] ) {
+			return '-';
+		}
+
+		return sprintf( '%.2f (%d)', $data['score'], $data['count'] );
 	}
 }

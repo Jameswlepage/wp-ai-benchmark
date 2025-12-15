@@ -91,8 +91,22 @@ npx wp-env run cli wp ai-bench run \
 - `--model` (required): Model to test in `provider:model` format
 - `--judge-model`: Model for quality evaluation (defaults to `--model`)
 - `--runs`: Number of runs for statistical averaging (default: 1)
+- `--concurrency`: Number of parallel test workers (default: 5)
 - `--verbose`: Show detailed per-test results
 - `--format`: Output format (`table` or `json`)
+- `--skip-judge`: Skip AI judge evaluation (faster, but no quality scores)
+
+### Parallel Execution
+
+By default, tests run with 5 concurrent workers for faster execution:
+
+```bash
+# Use 10 workers (faster, may hit API rate limits)
+npx wp-env run cli wp ai-bench run --suite=wp-core-v1 --model=anthropic:claude-sonnet-4-20250514 --concurrency=10
+
+# Run sequentially (slower, guaranteed order)
+npx wp-env run cli wp ai-bench run --suite=wp-core-v1 --model=anthropic:claude-sonnet-4-20250514 --concurrency=1
+```
 
 ### List Available Suites
 
@@ -221,24 +235,24 @@ BENCHMARK RESULTS
 Suite: wp-core-v1
 Model: anthropic:claude-sonnet-4-20250514
 Judge: anthropic:claude-sonnet-4-20250514
-Duration: 125.74s
+Runs: 1
+Duration: 45.32s
 Tests: 17 total (12 knowledge, 5 execution)
 
 SCORES:
-  Knowledge Score:            1.0000
-  Execution Correctness:      0.9783
-  Execution Quality:          0.8820
-  ----------------------------------------
-  OVERALL SCORE:              0.9559
 
-CATEGORY BREAKDOWN:
-  hooks:               1.0000 (4 tests)
-  queries:             1.0000 (2 tests)
-  security:            1.0000 (2 tests)
-  rest_api:            0.9638 (3 tests)
-  shortcodes:          1.0000 (1 tests)
-  ...
+  Category              Knowledge      Execution          Total
+  ------------------------------------------------------------
+  hooks                 1.00 (3)       0.95 (2)       0.98 (5)
+  queries               1.00 (2)              -       1.00 (2)
+  security              1.00 (2)       0.90 (1)       0.97 (3)
+  rest-api              1.00 (3)       0.85 (1)       0.96 (4)
+  shortcodes                   -       1.00 (1)       1.00 (1)
+
+  TOTAL                 1.00 (12)      0.98 (5)       0.96 (17)
 ```
+
+The scores table shows performance by category, split by test type (knowledge questions vs. code generation). This makes it easy to identify areas where the model excels or needs improvement.
 
 ## Development
 

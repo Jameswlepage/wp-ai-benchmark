@@ -76,6 +76,7 @@ class Runner {
 	 * @param string        $judge_model       Judge model identifier.
 	 * @param int           $runs              Number of runs for averaging.
 	 * @param callable|null $progress_callback Called after each test with (result, type, run).
+	 * @param int           $concurrency       Number of parallel workers (1 = sequential).
 	 *
 	 * @return array{
 	 *   suite: string,
@@ -83,7 +84,7 @@ class Runner {
 	 *   judge_model: string,
 	 *   runs: int,
 	 *   scores: array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float},
-	 *   category_scores: array<string, array{count: int, score: float, type: string}>,
+	 *   category_scores: array<string, array{knowledge: array{score: float, count: int}, execution: array{score: float, count: int}, total: array{score: float, count: int}}>,
 	 *   stats: array<string, array{mean: float, stddev: float, min: float, max: float, runs: int}>,
 	 *   test_results: array<Test_Result>,
 	 *   metadata: array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int, wp_version: string, php_version: string, benchmark_version: string}
@@ -95,31 +96,50 @@ class Runner {
 		string $judge_model,
 		int $runs = 1,
 		?callable $progress_callback = null,
+		int $concurrency = 1,
 	): array {
 		$suite       = $this->suite_loader->load( $suite_name );
 		$all_results = [];
 		$start_time  = microtime( true );
 
-		for ( $run = 1; $run <= $runs; $run++ ) {
-			// Run knowledge tests.
-			foreach ( $suite['knowledge_tests'] as $test ) {
-				$result = $this->knowledge_executor->execute( $test, $model );
-				$result->set_run_number( $run );
-				$all_results[] = $result;
+		// Use parallel execution if concurrency > 1.
+		if ( $concurrency > 1 ) {
+			$parallel_runner = new Parallel_Runner( $concurrency );
 
-				if ( $progress_callback ) {
-					$progress_callback( $result, 'knowledge', $run );
-				}
+			for ( $run = 1; $run <= $runs; $run++ ) {
+				$run_results = $parallel_runner->run(
+					$suite['knowledge_tests'],
+					$suite['execution_tests'],
+					$model,
+					$judge_model,
+					$run,
+					$progress_callback
+				);
+				$all_results = array_merge( $all_results, $run_results );
 			}
+		} else {
+			// Sequential execution.
+			for ( $run = 1; $run <= $runs; $run++ ) {
+				// Run knowledge tests.
+				foreach ( $suite['knowledge_tests'] as $test ) {
+					$result = $this->knowledge_executor->execute( $test, $model );
+					$result->set_run_number( $run );
+					$all_results[] = $result;
 
-			// Run execution tests.
-			foreach ( $suite['execution_tests'] as $test ) {
-				$result = $this->execution_executor->execute( $test, $model, $judge_model );
-				$result->set_run_number( $run );
-				$all_results[] = $result;
+					if ( $progress_callback ) {
+						$progress_callback( $result, 'knowledge', $run );
+					}
+				}
 
-				if ( $progress_callback ) {
-					$progress_callback( $result, 'execution', $run );
+				// Run execution tests.
+				foreach ( $suite['execution_tests'] as $test ) {
+					$result = $this->execution_executor->execute( $test, $model, $judge_model );
+					$result->set_run_number( $run );
+					$all_results[] = $result;
+
+					if ( $progress_callback ) {
+						$progress_callback( $result, 'execution', $run );
+					}
 				}
 			}
 		}
@@ -213,38 +233,52 @@ class Runner {
 	}
 
 	/**
-	 * Calculate scores broken down by category.
+	 * Calculate scores broken down by category, with knowledge/execution split.
 	 *
 	 * @param array<Test_Result> $results Test results.
 	 *
-	 * @return array<string, array{count: int, score: float, type: string}>
+	 * @return array<string, array{knowledge: array{score: float, count: int}, execution: array{score: float, count: int}, total: array{score: float, count: int}}>
 	 */
 	private function calculate_category_scores( array $results ): array {
 		$categories = [];
 
 		foreach ( $results as $result ) {
 			$category = $result->get_category() ?: 'uncategorized';
+			$type     = $result->get_type();
 
 			if ( ! isset( $categories[ $category ] ) ) {
 				$categories[ $category ] = [
-					'scores' => [],
-					'type'   => $result->get_type(),
+					'knowledge' => [],
+					'execution' => [],
 				];
 			}
 
-			if ( $result->get_type() === 'knowledge' ) {
-				$categories[ $category ]['scores'][] = $result->get_score();
+			if ( 'knowledge' === $type ) {
+				$categories[ $category ]['knowledge'][] = $result->get_score();
 			} else {
-				$categories[ $category ]['scores'][] = $result->get_correctness_score();
+				$categories[ $category ]['execution'][] = $result->get_correctness_score();
 			}
 		}
 
 		$category_scores = [];
 		foreach ( $categories as $category => $data ) {
+			$knowledge_scores = $data['knowledge'];
+			$execution_scores = $data['execution'];
+			$all_scores       = array_merge( $knowledge_scores, $execution_scores );
+
 			$category_scores[ $category ] = [
-				'count' => count( $data['scores'] ),
-				'score' => round( $this->safe_average( $data['scores'] ), 4 ),
-				'type'  => $data['type'],
+				'knowledge' => [
+					'score' => round( $this->safe_average( $knowledge_scores ), 4 ),
+					'count' => count( $knowledge_scores ),
+				],
+				'execution' => [
+					'score' => round( $this->safe_average( $execution_scores ), 4 ),
+					'count' => count( $execution_scores ),
+				],
+				'total'     => [
+					'score' => round( $this->safe_average( $all_scores ), 4 ),
+					'count' => count( $all_scores ),
+				],
 			];
 		}
 
