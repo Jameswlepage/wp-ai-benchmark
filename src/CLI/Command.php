@@ -419,7 +419,7 @@ class Command {
 
 		// Error summary.
 		$errors = array_filter( $results['test_results'], fn( $r ) => $r->has_error() );
-		if ( ! empty( $errors ) ) {
+		if ( ! empty( $errors ) && ! $verbose ) {
 			WP_CLI::warning( sprintf( '%d test(s) had errors. Use --verbose for details.', count( $errors ) ) );
 		}
 	}

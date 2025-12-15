@@ -20,6 +20,16 @@ use WordPress\AI_Client\AI_Client;
 class Model_Client {
 
 	/**
+	 * Maximum number of retry attempts for transient errors.
+	 */
+	private const MAX_RETRIES = 3;
+
+	/**
+	 * Initial delay in seconds before first retry (doubles each attempt).
+	 */
+	private const INITIAL_RETRY_DELAY = 2;
+
+	/**
 	 * Generate text from a prompt.
 	 *
 	 * @param string                    $prompt      The prompt to send to the model.
@@ -63,15 +73,31 @@ class Model_Client {
 			);
 		}
 
-		try {
-			return $builder->generate_text();
-		} catch ( \Throwable $e ) {
-			throw new \RuntimeException(
-				'AI generation failed: ' . $e->getMessage(),
-				0,
-				$e
-			);
+		$last_exception = null;
+		$delay          = self::INITIAL_RETRY_DELAY;
+
+		for ( $attempt = 0; $attempt <= self::MAX_RETRIES; $attempt++ ) {
+			try {
+				return $builder->generate_text();
+			} catch ( \Throwable $e ) {
+				$last_exception = $e;
+
+				// Only retry on transient errors.
+				if ( ! $this->is_retryable_error( $e ) || self::MAX_RETRIES === $attempt ) {
+					break;
+				}
+
+				// Wait before retrying with exponential backoff.
+				sleep( $delay );
+				$delay *= 2;
+			}
 		}
+
+		throw new \RuntimeException(
+			'AI generation failed: ' . $last_exception->getMessage(),
+			0,
+			$last_exception
+		);
 	}
 
 	/**
@@ -190,5 +216,49 @@ class Model_Client {
 				'WP AI Client SDK not available. Run "composer install" in the plugin directory.'
 			);
 		}
+	}
+
+	/**
+	 * Check if an error is retryable (transient server error).
+	 *
+	 * @param \Throwable $e The exception to check.
+	 *
+	 * @return bool True if the error is retryable.
+	 */
+	private function is_retryable_error( \Throwable $e ): bool {
+		$message = $e->getMessage();
+
+		// HTTP status codes that indicate transient errors.
+		$retryable_codes = [
+			'429', // Rate limited.
+			'500', // Internal server error.
+			'502', // Bad gateway.
+			'503', // Service unavailable.
+			'529', // Overloaded (Anthropic-specific).
+		];
+
+		foreach ( $retryable_codes as $code ) {
+			if ( str_contains( $message, "({$code})" ) ) {
+				return true;
+			}
+		}
+
+		// Also check for common transient error phrases.
+		$retryable_phrases = [
+			'overloaded',
+			'rate limit',
+			'too many requests',
+			'temporarily unavailable',
+			'service unavailable',
+		];
+
+		$message_lower = strtolower( $message );
+		foreach ( $retryable_phrases as $phrase ) {
+			if ( str_contains( $message_lower, $phrase ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
