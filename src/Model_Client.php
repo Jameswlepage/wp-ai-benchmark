@@ -2,12 +2,12 @@
 /**
  * WP AI Client wrapper for benchmark operations.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 use WordPress\AI_Client\AI_Client;
 
@@ -17,7 +17,7 @@ use WordPress\AI_Client\AI_Client;
  * Provides a simplified interface for text and JSON generation,
  * handling model parsing and error management.
  */
-class AI_Bench_Model_Client {
+class Model_Client {
 
 	/**
 	 * Generate text from a prompt.
@@ -143,8 +143,6 @@ class AI_Bench_Model_Client {
 			'openai',
 			'anthropic',
 			'google',
-			'mistral',
-			'cohere',
 		];
 	}
 

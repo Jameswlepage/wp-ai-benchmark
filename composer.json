@@ -28,8 +28,7 @@
 	},
 	"autoload": {
 		"psr-4": {
-			"WP_AI_Benchmarks\\": "inc/",
-			"WP_AI_Benchmarks\\CLI\\": "cli/"
+			"WordPress\\AI_Benchmark\\": "src/"
 		}
 	},
 	"scripts": {

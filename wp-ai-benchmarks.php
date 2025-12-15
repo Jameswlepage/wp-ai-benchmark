@@ -14,7 +14,7 @@
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 use WordPress\AI_Client\AI_Client;
 
@@ -32,8 +32,10 @@ define( 'WP_AI_BENCH_URL', plugin_dir_url( __FILE__ ) );
 if ( file_exists( WP_AI_BENCH_PATH . 'vendor/autoload.php' ) ) {
 	require_once WP_AI_BENCH_PATH . 'vendor/autoload.php';
 } else {
-	add_action( 'admin_notices', function (): void {
-		?>
+	add_action(
+		'admin_notices',
+		function (): void {
+			?>
 		<div class="notice notice-error">
 			<p>
 				<?php
@@ -44,41 +46,11 @@ if ( file_exists( WP_AI_BENCH_PATH . 'vendor/autoload.php' ) ) {
 				?>
 			</p>
 		</div>
-		<?php
-	} );
+			<?php
+		}
+	);
 	return;
 }
-
-/**
- * Autoloader for plugin classes.
- *
- * Follows WordPress naming convention: Class_Name -> class-class-name.php
- */
-spl_autoload_register( function ( string $class ): void {
-	$prefix = 'WP_AI_Benchmarks\\';
-
-	// Check if class uses our namespace.
-	if ( strpos( $class, $prefix ) !== 0 ) {
-		return;
-	}
-
-	// Get relative class name.
-	$relative_class = substr( $class, strlen( $prefix ) );
-
-	// Check for CLI namespace.
-	if ( strpos( $relative_class, 'CLI\\' ) === 0 ) {
-		$relative_class = substr( $relative_class, 4 );
-		$file           = WP_AI_BENCH_PATH . 'cli/class-' .
-			strtolower( str_replace( '_', '-', $relative_class ) ) . '.php';
-	} else {
-		$file = WP_AI_BENCH_PATH . 'inc/class-' .
-			strtolower( str_replace( '_', '-', $relative_class ) ) . '.php';
-	}
-
-	if ( file_exists( $file ) ) {
-		require_once $file;
-	}
-} );
 
 /**
  * Initialize the AI Client.
@@ -99,8 +71,10 @@ add_action( 'init', __NAMESPACE__ . '\\init_ai_client' );
  */
 function check_dependencies(): bool {
 	if ( ! class_exists( AI_Client::class ) ) {
-		add_action( 'admin_notices', function (): void {
-			?>
+		add_action(
+			'admin_notices',
+			function (): void {
+				?>
 			<div class="notice notice-error">
 				<p>
 					<?php
@@ -111,8 +85,9 @@ function check_dependencies(): bool {
 					?>
 				</p>
 			</div>
-			<?php
-		} );
+				<?php
+			}
+		);
 		return false;
 	}
 
@@ -132,6 +107,5 @@ add_action( 'plugins_loaded', __NAMESPACE__ . '\\init' );
 
 // Register WP-CLI commands.
 if ( defined( 'WP_CLI' ) && WP_CLI ) {
-	require_once WP_AI_BENCH_PATH . 'cli/class-ai-bench-command.php';
-	\WP_CLI::add_command( 'ai-bench', CLI\AI_Bench_Command::class );
+	\WP_CLI::add_command( 'ai-bench', CLI\Command::class );
 }

@@ -2,12 +2,12 @@
 /**
  * Runtime execution environment.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * Manages runtime execution environment for code testing.
@@ -15,7 +15,7 @@ namespace WP_AI_Benchmarks;
  * Safety is provided by Docker isolation (wp-env container).
  * Uses try/catch and shutdown handlers to capture errors.
  */
-class AI_Bench_Environment {
+class Environment {
 
 	/**
 	 * Default timeout in milliseconds.
@@ -74,7 +74,6 @@ class AI_Bench_Environment {
 					$passed_weight += $weight;
 				}
 			}
-
 		} catch ( \Throwable $e ) {
 			$results[] = [
 				'type'        => 'execution_error',

@@ -2,12 +2,12 @@
 /**
  * Static code checker.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * Static code analysis using regex patterns.
@@ -15,7 +15,7 @@ namespace WP_AI_Benchmarks;
  * Checks generated code against required and forbidden patterns
  * to provide objective correctness scoring.
  */
-class AI_Bench_Static_Checker {
+class Static_Checker {
 
 	/**
 	 * Check code against required and forbidden patterns.
@@ -128,7 +128,10 @@ class AI_Bench_Static_Checker {
 				}
 			}
 
-			return [ 'valid' => true, 'error' => null ];
+			return [
+				'valid' => true,
+				'error' => null,
+			];
 
 		} catch ( \Throwable $e ) {
 			restore_error_handler();
@@ -300,7 +303,7 @@ class AI_Bench_Static_Checker {
 	 */
 	public static function get_wordpress_patterns(): array {
 		return [
-			'hooks' => [
+			'hooks'      => [
 				[
 					'pattern'     => '/\badd_action\s*\(/i',
 					'description' => 'Registers an action hook',
@@ -318,7 +321,7 @@ class AI_Bench_Static_Checker {
 					'description' => 'Applies filters',
 				],
 			],
-			'queries' => [
+			'queries'    => [
 				[
 					'pattern'     => '/\bnew\s+WP_Query\s*\(/i',
 					'description' => 'Creates WP_Query instance',
@@ -346,7 +349,7 @@ class AI_Bench_Static_Checker {
 					'description' => 'Parses shortcode attributes',
 				],
 			],
-			'rest_api' => [
+			'rest_api'   => [
 				[
 					'pattern'     => '/\bregister_rest_route\s*\(/i',
 					'description' => 'Registers REST route',

@@ -2,12 +2,12 @@
 /**
  * Execution test executor.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * Executes HumanEval-style code generation tests with three-layer evaluation.
@@ -16,54 +16,54 @@ namespace WP_AI_Benchmarks;
  * Layer 2: Runtime checks (execute and verify)
  * Layer 3: AI judge (quality evaluation)
  */
-class AI_Bench_Executor_Execution {
+class Executor_Execution {
 
 	/**
 	 * Model client for AI requests.
 	 */
-	private AI_Bench_Model_Client $model_client;
+	private Model_Client $model_client;
 
 	/**
 	 * Static code checker.
 	 */
-	private AI_Bench_Static_Checker $static_checker;
+	private Static_Checker $static_checker;
 
 	/**
 	 * Runtime environment.
 	 */
-	private AI_Bench_Environment $environment;
+	private Environment $environment;
 
 	/**
 	 * AI judge for quality evaluation.
 	 */
-	private AI_Bench_Judge $judge;
+	private Judge $judge;
 
 	/**
 	 * Suite loader for rubrics.
 	 */
-	private AI_Bench_Suite_Loader $suite_loader;
+	private Suite_Loader $suite_loader;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param AI_Bench_Model_Client       $model_client   Model client instance.
-	 * @param AI_Bench_Static_Checker|null $static_checker Static checker instance.
-	 * @param AI_Bench_Environment|null    $environment    Environment instance.
-	 * @param AI_Bench_Judge|null          $judge          Judge instance.
-	 * @param AI_Bench_Suite_Loader|null   $suite_loader   Suite loader instance.
+	 * @param Model_Client        $model_client   Model client instance.
+	 * @param Static_Checker|null $static_checker Static checker instance.
+	 * @param Environment|null    $environment    Environment instance.
+	 * @param Judge|null          $judge          Judge instance.
+	 * @param Suite_Loader|null   $suite_loader   Suite loader instance.
 	 */
 	public function __construct(
-		AI_Bench_Model_Client $model_client,
-		?AI_Bench_Static_Checker $static_checker = null,
-		?AI_Bench_Environment $environment = null,
-		?AI_Bench_Judge $judge = null,
-		?AI_Bench_Suite_Loader $suite_loader = null,
+		Model_Client $model_client,
+		?Static_Checker $static_checker = null,
+		?Environment $environment = null,
+		?Judge $judge = null,
+		?Suite_Loader $suite_loader = null,
 	) {
 		$this->model_client   = $model_client;
-		$this->static_checker = $static_checker ?? new AI_Bench_Static_Checker();
-		$this->environment    = $environment ?? new AI_Bench_Environment();
-		$this->judge          = $judge ?? new AI_Bench_Judge( $model_client );
-		$this->suite_loader   = $suite_loader ?? new AI_Bench_Suite_Loader();
+		$this->static_checker = $static_checker ?? new Static_Checker();
+		$this->environment    = $environment ?? new Environment();
+		$this->judge          = $judge ?? new Judge( $model_client );
+		$this->suite_loader   = $suite_loader ?? new Suite_Loader();
 	}
 
 	/**
@@ -73,9 +73,9 @@ class AI_Bench_Executor_Execution {
 	 * @param string               $model       Model identifier for code generation.
 	 * @param string               $judge_model Model identifier for judge evaluation.
 	 *
-	 * @return AI_Bench_Test_Result
+	 * @return Test_Result
 	 */
-	public function execute( array $test, string $model, string $judge_model ): AI_Bench_Test_Result {
+	public function execute( array $test, string $model, string $judge_model ): Test_Result {
 		$start = microtime( true );
 
 		try {
@@ -90,7 +90,7 @@ class AI_Bench_Executor_Execution {
 			$code = $this->extract_code( $response );
 
 			if ( empty( $code ) ) {
-				$result = AI_Bench_Test_Result::error_result(
+				$result = Test_Result::error_result(
 					test_id: $test['id'],
 					type: 'execution',
 					error: 'No code extracted from model response',
@@ -109,7 +109,7 @@ class AI_Bench_Executor_Execution {
 			// Layer 3: AI Judge evaluation.
 			$judge_result = $this->run_judge_evaluation( $code, $test, $judge_model );
 
-			$result = AI_Bench_Test_Result::execution_result(
+			$result = Test_Result::execution_result(
 				test_id: $test['id'],
 				generated_code: $code,
 				static_score: $static_result['score'],
@@ -122,7 +122,7 @@ class AI_Bench_Executor_Execution {
 			);
 
 		} catch ( \Throwable $e ) {
-			$result = AI_Bench_Test_Result::error_result(
+			$result = Test_Result::error_result(
 				test_id: $test['id'],
 				type: 'execution',
 				error: $e->getMessage(),
@@ -143,7 +143,7 @@ class AI_Bench_Executor_Execution {
 	 * @return string Complete prompt.
 	 */
 	private function build_prompt( array $test ): string {
-		$prompt = "You are an expert WordPress developer. " . $test['prompt'];
+		$prompt = 'You are an expert WordPress developer. ' . $test['prompt'];
 
 		if ( ! empty( $test['requirements'] ) ) {
 			$prompt .= "\n\nRequirements:\n";
@@ -300,9 +300,9 @@ class AI_Bench_Executor_Execution {
 	 * @param array<string, mixed> $test  Test definition.
 	 * @param string               $model Model identifier.
 	 *
-	 * @return AI_Bench_Test_Result
+	 * @return Test_Result
 	 */
-	public function execute_without_judge( array $test, string $model ): AI_Bench_Test_Result {
+	public function execute_without_judge( array $test, string $model ): Test_Result {
 		$start = microtime( true );
 
 		try {
@@ -316,7 +316,7 @@ class AI_Bench_Executor_Execution {
 			$code = $this->extract_code( $response );
 
 			if ( empty( $code ) ) {
-				$result = AI_Bench_Test_Result::error_result(
+				$result = Test_Result::error_result(
 					test_id: $test['id'],
 					type: 'execution',
 					error: 'No code extracted from model response',
@@ -329,7 +329,7 @@ class AI_Bench_Executor_Execution {
 			$static_result  = $this->run_static_checks( $code, $test );
 			$runtime_result = $this->run_runtime_checks( $code, $test );
 
-			$result = AI_Bench_Test_Result::execution_result(
+			$result = Test_Result::execution_result(
 				test_id: $test['id'],
 				generated_code: $code,
 				static_score: $static_result['score'],
@@ -342,7 +342,7 @@ class AI_Bench_Executor_Execution {
 			);
 
 		} catch ( \Throwable $e ) {
-			$result = AI_Bench_Test_Result::error_result(
+			$result = Test_Result::error_result(
 				test_id: $test['id'],
 				type: 'execution',
 				error: $e->getMessage(),

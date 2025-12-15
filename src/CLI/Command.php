@@ -2,22 +2,22 @@
 /**
  * WP-CLI commands for AI benchmarking.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  *
  * @phpstan-type BenchmarkScores array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float}
  * @phpstan-type BenchmarkMetadata array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int}
  * @phpstan-type CategoryScore array{score: float, count: int}
- * @phpstan-type BenchmarkResults array{suite: string, model: string, judge_model: string, runs: int, scores: BenchmarkScores, category_scores: array<string, CategoryScore>, metadata: BenchmarkMetadata, test_results: array<\WP_AI_Benchmarks\AI_Bench_Test_Result>}
+ * @phpstan-type BenchmarkResults array{suite: string, model: string, judge_model: string, runs: int, scores: BenchmarkScores, category_scores: array<string, CategoryScore>, metadata: BenchmarkMetadata, test_results: array<\WordPress\AI_Benchmark\Test_Result>}
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks\CLI;
+namespace WordPress\AI_Benchmark\CLI;
 
-use WP_AI_Benchmarks\AI_Bench_Runner;
-use WP_AI_Benchmarks\AI_Bench_Suite_Loader;
-use WP_AI_Benchmarks\AI_Bench_Model_Client;
-use WP_AI_Benchmarks\AI_Bench_Test_Result;
+use WordPress\AI_Benchmark\Runner;
+use WordPress\AI_Benchmark\Suite_Loader;
+use WordPress\AI_Benchmark\Model_Client;
+use WordPress\AI_Benchmark\Test_Result;
 use WP_CLI;
 use WP_CLI\Utils;
 
@@ -35,26 +35,26 @@ use WP_CLI\Utils;
  *     # Run single test for debugging
  *     wp ai-bench run-test k-hooks-001 --model=openai:gpt-4.1
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
-class AI_Bench_Command {
+class Command {
 
 	/**
 	 * Suite loader instance.
 	 */
-	private AI_Bench_Suite_Loader $suite_loader;
+	private Suite_Loader $suite_loader;
 
 	/**
 	 * Model client instance.
 	 */
-	private AI_Bench_Model_Client $model_client;
+	private Model_Client $model_client;
 
 	/**
 	 * Constructor.
 	 */
 	public function __construct() {
-		$this->suite_loader = new AI_Bench_Suite_Loader();
-		$this->model_client = new AI_Bench_Model_Client();
+		$this->suite_loader = new Suite_Loader();
+		$this->model_client = new Model_Client();
 	}
 
 	/**
@@ -139,7 +139,7 @@ class AI_Bench_Command {
 		WP_CLI::log( sprintf( '  Runs: %d', $runs ) );
 		WP_CLI::log( '' );
 
-		$runner = new AI_Bench_Runner(
+		$runner = new Runner(
 			$this->suite_loader,
 			$this->model_client,
 		);
@@ -185,7 +185,6 @@ class AI_Bench_Command {
 			} else {
 				$this->display_table_results( $results, $verbose );
 			}
-
 		} catch ( \Throwable $e ) {
 			WP_CLI::error( 'Benchmark failed: ' . $e->getMessage() );
 		}
@@ -277,7 +276,7 @@ class AI_Bench_Command {
 			WP_CLI::error( 'Required: <test-id> and --model' );
 		}
 
-		$runner = new AI_Bench_Runner(
+		$runner = new Runner(
 			$this->suite_loader,
 			$this->model_client,
 		);
@@ -294,7 +293,6 @@ class AI_Bench_Command {
 			} else {
 				$this->display_single_result_detailed( $result );
 			}
-
 		} catch ( \Throwable $e ) {
 			WP_CLI::error( 'Test failed: ' . $e->getMessage() );
 		}
@@ -374,11 +372,14 @@ class AI_Bench_Command {
 		WP_CLI::log( sprintf( 'Judge: %s', $results['judge_model'] ) );
 		WP_CLI::log( sprintf( 'Runs: %d', $results['runs'] ) );
 		WP_CLI::log( sprintf( 'Duration: %.2fs', $results['metadata']['duration_seconds'] ) );
-		WP_CLI::log( sprintf( 'Tests: %d total (%d knowledge, %d execution)',
-			$results['metadata']['total_tests'],
-			$results['metadata']['knowledge_tests'],
-			$results['metadata']['execution_tests']
-		) );
+		WP_CLI::log(
+			sprintf(
+				'Tests: %d total (%d knowledge, %d execution)',
+				$results['metadata']['total_tests'],
+				$results['metadata']['knowledge_tests'],
+				$results['metadata']['execution_tests']
+			)
+		);
 		WP_CLI::log( '' );
 
 		// Main scores.
@@ -394,12 +395,14 @@ class AI_Bench_Command {
 		if ( ! empty( $results['category_scores'] ) ) {
 			WP_CLI::log( 'CATEGORY BREAKDOWN:' );
 			foreach ( $results['category_scores'] as $category => $data ) {
-				WP_CLI::log( sprintf(
-					'  %-20s %.4f (%d tests)',
-					$category . ':',
-					$data['score'],
-					$data['count']
-				) );
+				WP_CLI::log(
+					sprintf(
+						'  %-20s %.4f (%d tests)',
+						$category . ':',
+						$data['score'],
+						$data['count']
+					)
+				);
 			}
 			WP_CLI::log( '' );
 		}
@@ -424,9 +427,9 @@ class AI_Bench_Command {
 	/**
 	 * Display brief single result.
 	 *
-	 * @param AI_Bench_Test_Result $result Test result.
+	 * @param Test_Result $result Test result.
 	 */
-	private function display_single_result_brief( AI_Bench_Test_Result $result ): void {
+	private function display_single_result_brief( Test_Result $result ): void {
 		$id   = $result->get_test_id();
 		$type = $result->get_type();
 
@@ -439,10 +442,13 @@ class AI_Bench_Command {
 			$score  = $result->get_score();
 			$status = $score >= 1.0 ? 'PASS' : 'FAIL';
 			WP_CLI::log( sprintf( '  [%s] %s - Score: %.2f', $id, $status, $score ) );
-			WP_CLI::log( sprintf( '    Answer: %s (Expected: %s)',
-				$result->get_model_answer(),
-				$result->get_correct_answer()
-			) );
+			WP_CLI::log(
+				sprintf(
+					'    Answer: %s (Expected: %s)',
+					$result->get_model_answer(),
+					$result->get_correct_answer()
+				)
+			);
 		} else {
 			$data = $result->to_array();
 			WP_CLI::log( sprintf( '  [%s]', $id ) );
@@ -456,9 +462,9 @@ class AI_Bench_Command {
 	/**
 	 * Display detailed single result.
 	 *
-	 * @param AI_Bench_Test_Result $result Test result.
+	 * @param Test_Result $result Test result.
 	 */
-	private function display_single_result_detailed( AI_Bench_Test_Result $result ): void {
+	private function display_single_result_detailed( Test_Result $result ): void {
 		WP_CLI::log( sprintf( 'Test ID: %s', $result->get_test_id() ) );
 		WP_CLI::log( sprintf( 'Type: %s', $result->get_type() ) );
 		WP_CLI::log( sprintf( 'Category: %s', $result->get_category() ) );

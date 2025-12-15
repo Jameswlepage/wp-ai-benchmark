@@ -4,8 +4,7 @@
 
 	<!-- What to scan -->
 	<file>./wp-ai-benchmarks.php</file>
-	<file>./inc</file>
-	<file>./cli</file>
+	<file>./src</file>
 
 	<!-- Exclude patterns -->
 	<exclude-pattern>/vendor/*</exclude-pattern>
@@ -67,7 +66,7 @@
 		<properties>
 			<property name="prefixes" type="array">
 				<element value="wp_ai_bench"/>
-				<element value="WP_AI_Benchmarks"/>
+				<element value="WordPress\AI_Benchmark"/>
 				<element value="WP_AI_BENCH"/>
 			</property>
 		</properties>

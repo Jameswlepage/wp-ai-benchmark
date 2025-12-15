@@ -2,12 +2,12 @@
 /**
  * Benchmark runner.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * Orchestrates benchmark execution across test suites.
@@ -15,27 +15,27 @@ namespace WP_AI_Benchmarks;
  * Coordinates knowledge and execution tests, aggregates scores,
  * and manages multiple runs for statistical averaging.
  */
-class AI_Bench_Runner {
+class Runner {
 
 	/**
 	 * Suite loader.
 	 */
-	private AI_Bench_Suite_Loader $suite_loader;
+	private Suite_Loader $suite_loader;
 
 	/**
 	 * Model client.
 	 */
-	private AI_Bench_Model_Client $model_client;
+	private Model_Client $model_client;
 
 	/**
 	 * Knowledge test executor.
 	 */
-	private AI_Bench_Executor_Knowledge $knowledge_executor;
+	private Executor_Knowledge $knowledge_executor;
 
 	/**
 	 * Execution test executor.
 	 */
-	private AI_Bench_Executor_Execution $execution_executor;
+	private Executor_Execution $execution_executor;
 
 	/**
 	 * Score weights for overall calculation.
@@ -51,21 +51,21 @@ class AI_Bench_Runner {
 	/**
 	 * Constructor.
 	 *
-	 * @param AI_Bench_Suite_Loader           $suite_loader        Suite loader instance.
-	 * @param AI_Bench_Model_Client           $model_client        Model client instance.
-	 * @param AI_Bench_Executor_Knowledge|null $knowledge_executor Knowledge executor.
-	 * @param AI_Bench_Executor_Execution|null $execution_executor Execution executor.
+	 * @param Suite_Loader            $suite_loader        Suite loader instance.
+	 * @param Model_Client            $model_client        Model client instance.
+	 * @param Executor_Knowledge|null $knowledge_executor  Knowledge executor.
+	 * @param Executor_Execution|null $execution_executor  Execution executor.
 	 */
 	public function __construct(
-		AI_Bench_Suite_Loader $suite_loader,
-		AI_Bench_Model_Client $model_client,
-		?AI_Bench_Executor_Knowledge $knowledge_executor = null,
-		?AI_Bench_Executor_Execution $execution_executor = null,
+		Suite_Loader $suite_loader,
+		Model_Client $model_client,
+		?Executor_Knowledge $knowledge_executor = null,
+		?Executor_Execution $execution_executor = null,
 	) {
 		$this->suite_loader       = $suite_loader;
 		$this->model_client       = $model_client;
-		$this->knowledge_executor = $knowledge_executor ?? new AI_Bench_Executor_Knowledge( $model_client );
-		$this->execution_executor = $execution_executor ?? new AI_Bench_Executor_Execution( $model_client );
+		$this->knowledge_executor = $knowledge_executor ?? new Executor_Knowledge( $model_client );
+		$this->execution_executor = $execution_executor ?? new Executor_Execution( $model_client );
 	}
 
 	/**
@@ -85,7 +85,7 @@ class AI_Bench_Runner {
 	 *   scores: array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float},
 	 *   category_scores: array<string, array{count: int, score: float, type: string}>,
 	 *   stats: array<string, array{mean: float, stddev: float, min: float, max: float, runs: int}>,
-	 *   test_results: array<AI_Bench_Test_Result>,
+	 *   test_results: array<Test_Result>,
 	 *   metadata: array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int, wp_version: string, php_version: string, benchmark_version: string}
 	 * }
 	 */
@@ -156,13 +156,13 @@ class AI_Bench_Runner {
 	 * @param string $model       Model identifier.
 	 * @param string $judge_model Judge model identifier.
 	 *
-	 * @return AI_Bench_Test_Result
+	 * @return Test_Result
 	 */
 	public function run_single_test(
 		string $test_id,
 		string $model,
 		string $judge_model,
-	): AI_Bench_Test_Result {
+	): Test_Result {
 		$test = $this->suite_loader->find_test_by_id( $test_id );
 
 		if ( $test['type'] === 'knowledge' ) {
@@ -175,7 +175,7 @@ class AI_Bench_Runner {
 	/**
 	 * Calculate aggregate scores from all test results.
 	 *
-	 * @param array<AI_Bench_Test_Result> $results Test results.
+	 * @param array<Test_Result> $results Test results.
 	 *
 	 * @return array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float}
 	 */
@@ -215,7 +215,7 @@ class AI_Bench_Runner {
 	/**
 	 * Calculate scores broken down by category.
 	 *
-	 * @param array<AI_Bench_Test_Result> $results Test results.
+	 * @param array<Test_Result> $results Test results.
 	 *
 	 * @return array<string, array{count: int, score: float, type: string}>
 	 */
@@ -254,8 +254,8 @@ class AI_Bench_Runner {
 	/**
 	 * Calculate statistics for multiple runs.
 	 *
-	 * @param array<AI_Bench_Test_Result> $results All results across runs.
-	 * @param int                         $runs    Number of runs.
+	 * @param array<Test_Result> $results All results across runs.
+	 * @param int                $runs    Number of runs.
 	 *
 	 * @return array<string, array{mean: float, stddev: float, min: float, max: float, runs: int}>
 	 */

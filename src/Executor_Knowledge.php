@@ -2,12 +2,12 @@
 /**
  * Knowledge test executor.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * Executes MMLU-style knowledge tests.
@@ -15,19 +15,19 @@ namespace WP_AI_Benchmarks;
  * Handles multiple choice and short answer questions,
  * with objective scoring based on exact/regex matching.
  */
-class AI_Bench_Executor_Knowledge {
+class Executor_Knowledge {
 
 	/**
 	 * Model client for AI requests.
 	 */
-	private AI_Bench_Model_Client $model_client;
+	private Model_Client $model_client;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param AI_Bench_Model_Client $model_client Model client instance.
+	 * @param Model_Client $model_client Model client instance.
 	 */
-	public function __construct( AI_Bench_Model_Client $model_client ) {
+	public function __construct( Model_Client $model_client ) {
 		$this->model_client = $model_client;
 	}
 
@@ -37,9 +37,9 @@ class AI_Bench_Executor_Knowledge {
 	 * @param array<string, mixed> $test  Test definition.
 	 * @param string               $model Model identifier (e.g., 'openai:gpt-4.1').
 	 *
-	 * @return AI_Bench_Test_Result
+	 * @return Test_Result
 	 */
-	public function execute( array $test, string $model ): AI_Bench_Test_Result {
+	public function execute( array $test, string $model ): Test_Result {
 		$start = microtime( true );
 
 		try {
@@ -53,7 +53,7 @@ class AI_Bench_Executor_Knowledge {
 			$model_answer = $this->extract_answer( $response, $test['type'] );
 			$score        = $this->score_answer( $model_answer, $test );
 
-			$result = AI_Bench_Test_Result::knowledge_result(
+			$result = Test_Result::knowledge_result(
 				test_id: $test['id'],
 				score: $score,
 				model_answer: $model_answer,
@@ -62,7 +62,7 @@ class AI_Bench_Executor_Knowledge {
 			);
 
 		} catch ( \Throwable $e ) {
-			$result = AI_Bench_Test_Result::error_result(
+			$result = Test_Result::error_result(
 				test_id: $test['id'],
 				type: 'knowledge',
 				error: $e->getMessage(),

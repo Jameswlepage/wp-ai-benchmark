@@ -2,7 +2,7 @@
 /**
  * Test result value object.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  *
  * @phpstan-type StaticDetails array{score: float, checks: array<string, array{passed: bool, weight: float, message?: string}>}
  * @phpstan-type RuntimeDetails array{score: float, checks: array<string, array{passed: bool, message?: string}>}
@@ -11,7 +11,7 @@
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * Value object representing the result of a single benchmark test.
@@ -19,7 +19,7 @@ namespace WP_AI_Benchmarks;
  * Supports both knowledge tests (simple score) and execution tests
  * (static, runtime, and quality scores).
  */
-class AI_Bench_Test_Result {
+class Test_Result {
 
 	/**
 	 * Test identifier.

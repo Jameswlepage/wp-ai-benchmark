@@ -2,12 +2,12 @@
 /**
  * AI Judge for code quality evaluation.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 /**
  * LLM-as-Judge implementation for code quality evaluation.
@@ -15,19 +15,19 @@ namespace WP_AI_Benchmarks;
  * Uses a separate AI model to evaluate generated code quality
  * based on a structured rubric with multiple criteria.
  */
-class AI_Bench_Judge {
+class Judge {
 
 	/**
 	 * Model client for AI requests.
 	 */
-	private AI_Bench_Model_Client $model_client;
+	private Model_Client $model_client;
 
 	/**
 	 * Constructor.
 	 *
-	 * @param AI_Bench_Model_Client $model_client Model client instance.
+	 * @param Model_Client $model_client Model client instance.
 	 */
-	public function __construct( AI_Bench_Model_Client $model_client ) {
+	public function __construct( Model_Client $model_client ) {
 		$this->model_client = $model_client;
 	}
 

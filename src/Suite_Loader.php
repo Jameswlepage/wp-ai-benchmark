@@ -2,12 +2,12 @@
 /**
  * Test suite loader.
  *
- * @package WP_AI_Benchmarks
+ * @package WordPress\AI_Benchmark
  */
 
 declare(strict_types=1);
 
-namespace WP_AI_Benchmarks;
+namespace WordPress\AI_Benchmark;
 
 use JsonException;
 
@@ -19,7 +19,7 @@ use JsonException;
  * - tests/execution/{suite-name}.json for execution tests
  * - judges/{rubric-id}.json for judge rubrics
  */
-class AI_Bench_Suite_Loader {
+class Suite_Loader {
 
 	/**
 	 * Path to tests directory.
@@ -144,11 +144,11 @@ class AI_Bench_Suite_Loader {
 		// Scan knowledge directory.
 		$knowledge_pattern = $this->tests_path . 'knowledge/*.json';
 		foreach ( glob( $knowledge_pattern ) ?: [] as $file ) {
-			$name         = basename( $file, '.json' );
+			$name          = basename( $file, '.json' );
 			$seen[ $name ] = true;
 
 			try {
-				$data = $this->load_json_file( $file );
+				$data            = $this->load_json_file( $file );
 				$suites[ $name ] = [
 					'name'            => $name,
 					'types'           => [ 'knowledge' ],
@@ -314,12 +314,12 @@ class AI_Bench_Suite_Loader {
 		$categories = [];
 
 		foreach ( $suite['knowledge_tests'] as $test ) {
-			$cat = $test['category'] ?? 'uncategorized';
+			$cat                = $test['category'] ?? 'uncategorized';
 			$categories[ $cat ] = ( $categories[ $cat ] ?? 0 ) + 1;
 		}
 
 		foreach ( $suite['execution_tests'] as $test ) {
-			$cat = $test['category'] ?? 'uncategorized';
+			$cat                = $test['category'] ?? 'uncategorized';
 			$categories[ $cat ] = ( $categories[ $cat ] ?? 0 ) + 1;
 		}
 
@@ -341,7 +341,7 @@ class AI_Bench_Suite_Loader {
 
 		if ( $content === false ) {
 			throw new \RuntimeException(
-				sprintf( "Cannot read file: %s", $path )
+				sprintf( 'Cannot read file: %s', $path )
 			);
 		}
 

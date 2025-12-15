@@ -5,8 +5,7 @@ parameters:
     level: 6
     paths:
         - wp-ai-benchmarks.php
-        - inc
-        - cli
+        - src
     excludePaths:
         - vendor
     scanDirectories:
