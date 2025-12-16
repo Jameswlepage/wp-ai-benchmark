@@ -1,6 +1,7 @@
 # Dependencies
 /vendor/
 /node_modules/
+.venv/
 
 # wp-env
 /.wp-env/

@@ -1,0 +1,306 @@
+{
+  "id": "wp-core-knowledge-v1",
+  "version": "1.1.0",
+  "metadata": {
+    "name": "WordPress Core Knowledge",
+    "description": "Tests fundamental and modern WordPress API knowledge including hooks, REST, block bindings, visibility, and the Abilities API",
+    "wp_version": "6.9",
+    "created_at": "2025-12-16"
+  },
+  "tests": [
+    {
+      "id": "k-hooks-001",
+      "category": "hooks",
+      "subcategory": "actions",
+      "difficulty": "basic",
+      "prompt": "Which WordPress hook fires after all plugins have been loaded?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "init" },
+        { "key": "B", "text": "plugins_loaded" },
+        { "key": "C", "text": "after_setup_theme" },
+        { "key": "D", "text": "wp_loaded" }
+      ],
+      "correct_answer": "B",
+      "explanation": "The 'plugins_loaded' action fires once all must-use, network-activated and regular plugins have loaded.",
+      "references": ["https://developer.wordpress.org/reference/hooks/plugins_loaded/"]
+    },
+    {
+      "id": "k-hooks-002",
+      "category": "hooks",
+      "subcategory": "filters",
+      "difficulty": "intermediate",
+      "prompt": "What is the correct hook to modify the main WordPress query before it executes?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "the_posts" },
+        { "key": "B", "text": "pre_get_posts" },
+        { "key": "C", "text": "posts_where" },
+        { "key": "D", "text": "query_vars" }
+      ],
+      "correct_answer": "B",
+      "explanation": "pre_get_posts fires before the query is executed and allows modification of query variables.",
+      "references": ["https://developer.wordpress.org/reference/hooks/pre_get_posts/"]
+    },
+    {
+      "id": "k-hooks-003",
+      "category": "hooks",
+      "subcategory": "actions",
+      "difficulty": "intermediate",
+      "prompt": "Which action hook should be used to enqueue scripts and styles for the front-end of a WordPress site?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "admin_enqueue_scripts" },
+        { "key": "B", "text": "wp_head" },
+        { "key": "C", "text": "wp_enqueue_scripts" },
+        { "key": "D", "text": "init" }
+      ],
+      "correct_answer": "C",
+      "explanation": "wp_enqueue_scripts is the proper hook for enqueueing scripts and styles on the front-end.",
+      "references": ["https://developer.wordpress.org/reference/hooks/wp_enqueue_scripts/"]
+    },
+    {
+      "id": "k-queries-001",
+      "category": "queries",
+      "difficulty": "basic",
+      "prompt": "What WordPress function should be used to safely insert data into the database?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "$wpdb->query()" },
+        { "key": "B", "text": "$wpdb->insert()" },
+        { "key": "C", "text": "mysql_query()" },
+        { "key": "D", "text": "wp_insert_data()" }
+      ],
+      "correct_answer": "B",
+      "explanation": "$wpdb->insert() handles data escaping and provides a safe way to insert rows.",
+      "references": ["https://developer.wordpress.org/reference/classes/wpdb/insert/"]
+    },
+    {
+      "id": "k-queries-002",
+      "category": "queries",
+      "difficulty": "intermediate",
+      "prompt": "In WP_Query, which parameter limits the number of posts returned?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "limit" },
+        { "key": "B", "text": "max_posts" },
+        { "key": "C", "text": "posts_per_page" },
+        { "key": "D", "text": "numberposts" }
+      ],
+      "correct_answer": "C",
+      "explanation": "posts_per_page is the WP_Query parameter that limits the number of posts returned per page.",
+      "references": ["https://developer.wordpress.org/reference/classes/wp_query/"]
+    },
+    {
+      "id": "k-security-001",
+      "category": "security",
+      "difficulty": "basic",
+      "prompt": "Which function should be used to escape HTML output in WordPress?",
+      "type": "short_answer",
+      "correct_answer": "esc_html",
+      "answer_type": "contains",
+      "explanation": "esc_html() escapes HTML entities for safe output in HTML context."
+    },
+    {
+      "id": "k-security-002",
+      "category": "security",
+      "difficulty": "intermediate",
+      "prompt": "What function should be used to verify a nonce in WordPress?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "check_nonce()" },
+        { "key": "B", "text": "wp_verify_nonce()" },
+        { "key": "C", "text": "validate_nonce()" },
+        { "key": "D", "text": "nonce_check()" }
+      ],
+      "correct_answer": "B",
+      "explanation": "wp_verify_nonce() is the WordPress function to verify a nonce value.",
+      "references": ["https://developer.wordpress.org/reference/functions/wp_verify_nonce/"]
+    },
+    {
+      "id": "k-roles-001",
+      "category": "roles_caps",
+      "difficulty": "intermediate",
+      "prompt": "What capability is required by default to install plugins in WordPress?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "manage_options" },
+        { "key": "B", "text": "install_plugins" },
+        { "key": "C", "text": "activate_plugins" },
+        { "key": "D", "text": "edit_plugins" }
+      ],
+      "correct_answer": "B",
+      "explanation": "The 'install_plugins' capability controls who can install new plugins."
+    },
+    {
+      "id": "k-rest-001",
+      "category": "rest_api",
+      "difficulty": "intermediate",
+      "prompt": "What is the default namespace prefix for WordPress core REST API endpoints?",
+      "type": "short_answer",
+      "correct_answer": "wp/v2",
+      "answer_type": "exact",
+      "explanation": "WordPress core REST API uses the 'wp/v2' namespace for all built-in endpoints."
+    },
+    {
+      "id": "k-rest-002",
+      "category": "rest_api",
+      "difficulty": "intermediate",
+      "prompt": "Which function is used to register a custom REST API route in WordPress?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "add_rest_route()" },
+        { "key": "B", "text": "register_rest_route()" },
+        { "key": "C", "text": "wp_register_route()" },
+        { "key": "D", "text": "rest_api_init()" }
+      ],
+      "correct_answer": "B",
+      "explanation": "register_rest_route() is the function used to register custom REST API endpoints.",
+      "references": ["https://developer.wordpress.org/reference/functions/register_rest_route/"]
+    },
+    {
+      "id": "k-blocks-001",
+      "category": "block_editor",
+      "difficulty": "basic",
+      "prompt": "What function is used to register a block type in WordPress?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "wp_register_block()" },
+        { "key": "B", "text": "add_block_type()" },
+        { "key": "C", "text": "register_block_type()" },
+        { "key": "D", "text": "create_block()" }
+      ],
+      "correct_answer": "C",
+      "explanation": "register_block_type() is the PHP function to register a block type.",
+      "references": ["https://developer.wordpress.org/reference/functions/register_block_type/"]
+    },
+    {
+      "id": "k-transients-001",
+      "category": "caching",
+      "difficulty": "basic",
+      "prompt": "What function retrieves a transient value in WordPress?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "wp_get_transient()" },
+        { "key": "B", "text": "get_transient()" },
+        { "key": "C", "text": "fetch_transient()" },
+        { "key": "D", "text": "transient_get()" }
+      ],
+      "correct_answer": "B",
+      "explanation": "get_transient() retrieves the value of a transient.",
+      "references": ["https://developer.wordpress.org/reference/functions/get_transient/"]
+    },
+    {
+      "id": "k-abilities-001",
+      "category": "abilities_api",
+      "difficulty": "intermediate",
+      "prompt": "Which hook should plugins use to register abilities with the WordPress Abilities API?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "init" },
+        { "key": "B", "text": "wp_loaded" },
+        { "key": "C", "text": "wp_abilities_api_init" },
+        { "key": "D", "text": "rest_api_init" }
+      ],
+      "correct_answer": "C",
+      "explanation": "Abilities are registered during the wp_abilities_api_init hook.",
+      "references": ["https://make.wordpress.org/core/2024/07/03/wordpress-6-8-field-guide/#abilities-api"]
+    },
+    {
+      "id": "k-abilities-002",
+      "category": "abilities_api",
+      "difficulty": "basic",
+      "prompt": "How do you expose a custom ability over the REST API when calling wp_register_ability()?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Set 'rest' => true in the args" },
+        { "key": "B", "text": "Add a REST route manually" },
+        { "key": "C", "text": "Pass 'show_in_rest' => true in the meta array" },
+        { "key": "D", "text": "It is always exposed automatically" }
+      ],
+      "correct_answer": "C",
+      "explanation": "Abilities are opt-in to REST; set show_in_rest => true when registering.",
+      "references": ["https://developer.wordpress.org/news/2024/10/16/abilities-api-coming-to-wordpress-core-6-9/"]
+    },
+    {
+      "id": "k-bindings-001",
+      "category": "block_bindings",
+      "difficulty": "basic",
+      "prompt": "Which function registers a custom block bindings source?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "register_block_source()" },
+        { "key": "B", "text": "register_block_bindings_source()" },
+        { "key": "C", "text": "add_block_binding()" },
+        { "key": "D", "text": "wp_register_binding()" }
+      ],
+      "correct_answer": "B",
+      "explanation": "register_block_bindings_source() adds a new source to the Block Bindings Registry.",
+      "references": ["https://developer.wordpress.org/news/2024/04/16/block-bindings-api-in-core/"]
+    },
+    {
+      "id": "k-bindings-002",
+      "category": "block_bindings",
+      "difficulty": "intermediate",
+      "prompt": "Which filter lets you declare which attributes of a specific block type can be bound via the Block Bindings API?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "block_bindings_attributes" },
+        { "key": "B", "text": "block_bindings_supported_attributes_{block_type}" },
+        { "key": "C", "text": "block_supported_attributes" },
+        { "key": "D", "text": "block_attributes_whitelist" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Use block_bindings_supported_attributes_{block_type} to opt specific attributes into bindings.",
+      "references": ["https://github.com/WordPress/gutenberg/blob/trunk/docs/reference-guides/block-bindings.md#supported-attributes"]
+    },
+    {
+      "id": "k-visibility-001",
+      "category": "block_editor",
+      "difficulty": "basic",
+      "prompt": "Which block support flag enables the built-in \"Hide block\" toggle introduced in recent WordPress versions?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "supports.lock" },
+        { "key": "B", "text": "supports.visibility" },
+        { "key": "C", "text": "supports.hidden" },
+        { "key": "D", "text": "supports.render" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Setting supports.visibility to true enables the Hide/Show control for the block.",
+      "references": ["https://wptavern.com/wordpress-6-7-beta-1-brings-enhanced-block-visibility"]
+    },
+    {
+      "id": "k-blockapi-001",
+      "category": "block_editor",
+      "difficulty": "intermediate",
+      "prompt": "For blocks that run inside the iframe-backed editor in WordPress 6.9+, which Block API version must block.json declare?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "apiVersion: 1" },
+        { "key": "B", "text": "apiVersion: 2" },
+        { "key": "C", "text": "apiVersion: 3" },
+        { "key": "D", "text": "Any version is accepted" }
+      ],
+      "correct_answer": "C",
+      "explanation": "apiVersion 3 is required for iframe-compatible block.json validation.",
+      "references": ["https://make.wordpress.org/core/2024/12/05/whats-new-in-gutenberg-19-5-0/"]
+    },
+    {
+      "id": "k-accordion-001",
+      "category": "block_editor",
+      "difficulty": "basic",
+      "prompt": "Which new core block introduced in WordPress 6.9 provides collapsible content sections?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Tabs" },
+        { "key": "B", "text": "Details" },
+        { "key": "C", "text": "Accordion" },
+        { "key": "D", "text": "Summary" }
+      ],
+      "correct_answer": "C",
+      "explanation": "WordPress 6.9 ships with a native Accordion block for collapsible sections.",
+      "references": ["https://developer.wordpress.org/news/2024/12/wordpress-6-9-beta-1/"]
+    }
+  ]
+}
