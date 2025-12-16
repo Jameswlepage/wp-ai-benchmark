@@ -510,6 +510,86 @@
       "correct_answer": "B",
       "explanation": "Block hooks are applied to theme templates, template parts, and patterns when registered; user-authored post content isn’t rewritten, so the hooked block never appears there.",
       "references": ["https://make.wordpress.org/core/2023/10/15/introducing-block-hooks-for-dynamic-blocks/"]
+    },
+    {
+      "id": "k-blockhooks-multiple-001",
+      "category": "block_hooks",
+      "difficulty": "hard",
+      "prompt": "What happens when a hooked block declares \"multiple\": false and an instance already exists in the current context?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Another instance is inserted after the anchor" },
+        { "key": "B", "text": "The hook is skipped for that context" },
+        { "key": "C", "text": "The hook throws a block validation error" },
+        { "key": "D", "text": "The hook is deferred to render time" }
+      ],
+      "correct_answer": "B",
+      "explanation": "With multiple:false, block hooks insert at most one instance per context; if one already exists, no new instance is injected.",
+      "references": ["https://core.trac.wordpress.org/ticket/61902"]
+    },
+    {
+      "id": "k-blockhooks-ignored-001",
+      "category": "block_hooks",
+      "difficulty": "hard",
+      "prompt": "How do user-modified templates prevent auto-insertion of a hooked block after removal?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Set multiple:false on the hooked block" },
+        { "key": "B", "text": "Add the block to ignoredHookedBlocks on the anchor block" },
+        { "key": "C", "text": "Disable block hooks in theme.json" },
+        { "key": "D", "text": "Rename the anchor block" }
+      ],
+      "correct_answer": "B",
+      "explanation": "User edits persist by storing the removed block type in the anchor’s ignoredHookedBlocks array, which stops re-insertion on render.",
+      "references": ["https://make.wordpress.org/core/2024/03/04/updates-to-block-hooks-in-6-5/"]
+    },
+    {
+      "id": "k-dataviews-locked-001",
+      "category": "dataviews",
+      "difficulty": "hard",
+      "prompt": "In WordPress 6.9 DataViews, how do you make a filter visible but non-editable by users?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Set editable:false on the view" },
+        { "key": "B", "text": "Use isLocked:true on the filter definition" },
+        { "key": "C", "text": "Omit the operator field" },
+        { "key": "D", "text": "Register the filter server-side only" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Locked filters are defined with isLocked:true, keeping them applied while preventing user edits or removal.",
+      "references": ["https://make.wordpress.org/core/2025/11/11/dataviews-dataform-et-al-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-dataviews-groupby-001",
+      "category": "dataviews",
+      "difficulty": "hard",
+      "prompt": "Which view option groups items by a field in the enhanced DataViews API in 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "group" },
+        { "key": "B", "text": "groupByField" },
+        { "key": "C", "text": "aggregateBy" },
+        { "key": "D", "text": "clusterField" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Set groupByField to a field ID to have table, grid, or list layouts group items by that field.",
+      "references": ["https://make.wordpress.org/core/2025/11/11/dataviews-dataform-et-al-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-blockhooks-context-002",
+      "category": "block_hooks",
+      "difficulty": "hard",
+      "prompt": "Where are block hooks applied by default as of WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Only classic template files" },
+        { "key": "B", "text": "Templates, template parts, patterns, and navigation posts" },
+        { "key": "C", "text": "Post content and reusable blocks only" },
+        { "key": "D", "text": "Widgets and sidebars only" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Block hooks run in layout contexts (templates, template parts, patterns, navigation posts), not inside post content.",
+      "references": ["https://make.wordpress.org/core/2023/10/15/introducing-block-hooks-for-dynamic-blocks/"]
     }
   ]
 }
