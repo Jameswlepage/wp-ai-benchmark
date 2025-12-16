@@ -7,6 +7,9 @@
 /output/
 /artifacts/
 
+# Generated dataset exports (run `python datasets/export_dataset.py` to regenerate)
+/datasets/data/
+
 # Local config (copy from wp-bench.example.yaml)
 wp-bench.yaml
 

@@ -52,6 +52,7 @@ def load_tests(config: DatasetConfig) -> Dict[str, List[Any]]:
 
 
 def _load_from_huggingface(config: DatasetConfig) -> Dict[str, List[Any]]:
+    """Load dataset from Hugging Face Hub (Parquet format)."""
     dataset = hf_load_dataset(
         config.name,
         revision=config.revision,
@@ -60,22 +61,30 @@ def _load_from_huggingface(config: DatasetConfig) -> Dict[str, List[Any]]:
     )
     execution: List[ExecutionTest] = []
     knowledge: List[KnowledgeTest] = []
+
     for row in dataset:
+        # Parse JSON-encoded fields from Parquet format
+        requirements = _parse_json_field(row.get("requirements", "[]"))
+        static_checks = _parse_json_field(row.get("static_checks", "{}"))
+        runtime_checks = _parse_json_field(row.get("runtime_checks", "{}"))
+        judge_config = _parse_json_field(row.get("judge_config", "{}"))
+        choices = _parse_json_field(row.get("choices", "[]"))
+
         if row.get("test_kind") == "execution":
             execution.append(
                 ExecutionTest(
                     id=row["id"],
                     suite=row.get("suite", config.name),
                     prompt=row["prompt"],
-                    test_type=row.get("test_type", "execution"),
+                    test_type="execution",
                     category=row.get("category", "general"),
                     difficulty=row.get("difficulty", "unknown"),
-                    requirements=row.get("requirements", []),
-                    static_checks=row.get("static_checks", {}),
-                    runtime_checks=row.get("runtime_checks", {}),
-                    judge_config=row.get("judge_config"),
+                    requirements=requirements if isinstance(requirements, list) else [],
+                    static_checks=static_checks if isinstance(static_checks, dict) else {},
+                    runtime_checks=runtime_checks if isinstance(runtime_checks, dict) else {},
+                    judge_config=judge_config if isinstance(judge_config, dict) else None,
                     reference_solution=row.get("reference_solution"),
-                    metadata=row.get("metadata", {}),
+                    metadata={},
                 )
             )
         else:
@@ -84,15 +93,25 @@ def _load_from_huggingface(config: DatasetConfig) -> Dict[str, List[Any]]:
                     id=row["id"],
                     suite=row.get("suite", config.name),
                     prompt=row["prompt"],
-                    test_type=row.get("test_type", "knowledge"),
+                    test_type="knowledge",
                     category=row.get("category", "general"),
                     difficulty=row.get("difficulty", "unknown"),
-                    choices=row.get("choices"),
+                    choices=choices if isinstance(choices, list) else None,
                     correct_answer=row.get("correct_answer"),
-                    metadata=row.get("metadata", {}),
+                    metadata={},
                 )
             )
     return {"execution": execution, "knowledge": knowledge}
+
+
+def _parse_json_field(value: Any) -> Any:
+    """Parse a JSON-encoded string field, or return as-is if already parsed."""
+    if isinstance(value, str):
+        try:
+            return orjson.loads(value)
+        except (orjson.JSONDecodeError, TypeError):
+            return value
+    return value
 
 
 def _load_from_local_files(config: DatasetConfig) -> Dict[str, List[Any]]:

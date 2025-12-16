@@ -1,19 +1,72 @@
 # WP-Bench Datasets
 
-This directory contains the canonical suites and tooling for uploading them to the Hugging Face `datasets` Hub.
+This directory contains the benchmark test suites and tooling for publishing to Hugging Face Hub.
 
-- `suites/<suite>/execution.json` / `knowledge.json` – source of truth for each benchmark suite.
-- `wp_bench.py` – Hugging Face builder that loads those files directly.
-- `export_dataset.py` – convenience script for bundling suites prior to upload.
+## Structure
 
-## Local development
-
-```bash
-python -m datasets.load_dataset datasets/wp_bench.py --name wp-core-v1 --split test
+```
+datasets/
+├── suites/                    # Source of truth (human-editable JSON)
+│   └── wp-core-v1/
+│       ├── execution.json     # Code generation tests
+│       └── knowledge.json     # Multiple choice / short answer tests
+├── data/                      # Generated Parquet for HF (gitignored)
+│   └── test.parquet
+├── export_dataset.py          # Converts suites → Parquet
+└── README.md
 ```
 
-Publishing is handled via `datasets-cli`:
+## Local Development
 
-```bash
-huggingface-cli upload WordPress/wp-bench-v1 datasets/
+The harness loads directly from `suites/` JSON files:
+
+```yaml
+# wp-bench.yaml
+dataset:
+  source: local
+  name: wp-core-v1
 ```
+
+## Publishing to Hugging Face
+
+1. **Export to Parquet:**
+   ```bash
+   python datasets/export_dataset.py
+   ```
+
+2. **Upload to HF Hub:**
+   ```bash
+   huggingface-cli upload WordPress/wp-bench-v1 datasets/data/
+   ```
+
+3. **Users can then load:**
+   ```python
+   from datasets import load_dataset
+   ds = load_dataset("WordPress/wp-bench-v1", split="test")
+   ```
+
+## Adding New Suites
+
+1. Create `suites/<suite-name>/execution.json` and `knowledge.json`
+2. Follow the schema in existing suites
+3. Run `python datasets/export_dataset.py` to include in Parquet export
+
+## Schema
+
+### Execution Tests
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique test ID |
+| `prompt` | string | Task description for the model |
+| `requirements` | array | List of requirements the solution must meet |
+| `static_checks` | object | Regex patterns to check in generated code |
+| `runtime_checks` | object | Assertions to run in WordPress environment |
+| `reference_solution` | string | Example correct solution |
+
+### Knowledge Tests
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique test ID |
+| `prompt` | string | Question text |
+| `choices` | array | Multiple choice options `[{key, text}]` |
+| `correct_answer` | string | Correct choice key (e.g., "B") |
