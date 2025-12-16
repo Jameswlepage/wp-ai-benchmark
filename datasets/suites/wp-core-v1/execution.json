@@ -750,6 +750,143 @@
       },
       "judge_config": { "rubric_id": "wp-judge-rubric-v1" },
       "reference_solution": "function wpbp_cached_flag(): bool {\n    $cached = wp_cache_get( 'flag', 'wpbp-cache-flag', false, $found );\n    if ( $found ) {\n        return (bool) $cached;\n    }\n    // Simulate expensive computation that yields false first time.\n    $value = false;\n    wp_cache_set( 'flag', $value, 'wpbp-cache-flag' );\n    return $value;\n}"
+    },
+    {
+      "id": "e-interactivity-client-nav-001",
+      "category": "interactivity_api",
+      "difficulty": "hard",
+      "prompt": "Register a script module 'demo/nav' and mark it as client-navigation-compatible so it loads on SPA transitions. Prove the script tag contains data-wp-router-options with loadOnClientNavigation true.",
+      "expected_behavior": "Enqueuing the module prints a script tag with data-wp-router-options including \\\"loadOnClientNavigation\\\":true.",
+      "requirements": [
+        "Call wp_register_script_module to register 'demo/nav' with a placeholder file",
+        "Use wp_interactivity()->add_client_navigation_support_to_script_module('demo/nav')",
+        "Enqueue the module so wp_print_script_modules outputs it",
+        "Script tag must include data-wp-router-options with loadOnClientNavigation true"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          { "pattern": "wp_register_script_module", "description": "Registers script module", "weight": 1.0 },
+          { "pattern": "add_client_navigation_support_to_script_module", "description": "Marks module for client navigation", "weight": 0.8 },
+          { "pattern": "wp_enqueue_script_module", "description": "Enqueues module", "weight": 0.6 }
+        ],
+        "forbidden_patterns": [
+          { "pattern": "wp_enqueue_script\\s*\\(", "description": "Must use module API, not classic scripts", "severity": "warning" }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "custom_assertion",
+            "code": "if ( ! function_exists('wp_register_script_module') ) { return false; } ob_start(); wp_enqueue_script_module( 'demo/nav' ); wp_print_script_modules(); $html = ob_get_clean(); return str_contains( $html, 'demo/nav' ) && str_contains( $html, 'data-wp-router-options' ) && str_contains( $html, 'loadOnClientNavigation' );",
+            "description": "Script tag contains client navigation directive",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": { "rubric_id": "wp-judge-rubric-v1" },
+      "reference_solution": "add_action( 'init', function() {\n    wp_register_script_module( 'demo/nav', includes_url( 'js/wp-util.js' ) ); // placeholder URL available in core.\n    wp_interactivity()->add_client_navigation_support_to_script_module( 'demo/nav' );\n    wp_enqueue_script_module( 'demo/nav' );\n} );"
+    },
+    {
+      "id": "e-html-strip-scripts-001",
+      "category": "html_api",
+      "difficulty": "hard",
+      "prompt": "Write wpbp_strip_scripts($html) that removes all <script> tags (inline and external) using WP_HTML_Tag_Processor, while preserving other markup such as <svg> and <p>.",
+      "expected_behavior": "Returns HTML without any script tags; keeps other elements intact.",
+      "requirements": [
+        "Use WP_HTML_Tag_Processor (or WP_HTML_Processor) to iterate and skip scripts",
+        "Handle both inline and external script tags",
+        "Return the cleaned HTML string",
+        "Do not use regex or DOMDocument"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          { "pattern": "WP_HTML_Tag_Processor|WP_HTML_Processor", "description": "Uses HTML API", "weight": 1.0 },
+          { "pattern": "next_tag|next_token", "description": "Iterates tokens", "weight": 0.6 }
+        ],
+        "forbidden_patterns": [
+          { "pattern": "preg_replace", "description": "No regex stripping", "severity": "warning" },
+          { "pattern": "DOMDocument", "description": "Avoid DOMDocument", "severity": "warning" }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "custom_assertion",
+            "code": "if ( ! function_exists('wpbp_strip_scripts') ) { return false; } $html = '<div><script>alert(1)</script><p>Keep</p><svg><title>X</title></svg><script src=\"/x.js\"></script></div>'; $out = wpbp_strip_scripts( $html ); return ! str_contains( $out, '<script' ) && str_contains( $out, '<p>Keep</p>' ) && str_contains( $out, '<svg>' );",
+            "description": "Scripts removed, other tags kept",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": { "rubric_id": "wp-judge-rubric-v1" },
+      "reference_solution": "function wpbp_strip_scripts( string $html ): string {\n    $processor = WP_HTML_Tag_Processor::create_fragment( $html );\n    $output    = '';\n    while ( $processor->next_tag() ) {\n        if ( 'script' === $processor->get_tag() ) {\n            $processor->remove_tag();\n        }\n    }\n    return $processor->get_updated_html();\n}"
+    },
+    {
+      "id": "e-cache-get-multiple-001",
+      "category": "caching",
+      "difficulty": "hard",
+      "prompt": "Implement wpbp_get_options_cached(array $keys) that uses wp_cache_get_multiple to fetch options and fills misses from get_option without overwriting cached falsey values.",
+      "expected_behavior": "Returns associative array of option values; cached false is preserved; misses are saved back to cache.",
+      "requirements": [
+        "Call wp_cache_get_multiple with a custom group (e.g., 'options') and capture missing keys via the miss list",
+        "For misses, call get_option and wp_cache_set_multiple",
+        "Do not treat falsey cached values as misses"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          { "pattern": "wp_cache_get_multiple", "description": "Batch cache get", "weight": 1.0 },
+          { "pattern": "wp_cache_set_multiple", "description": "Batch cache set for misses", "weight": 0.8 }
+        ],
+        "forbidden_patterns": [
+          { "pattern": "wp_cache_delete", "description": "No deletes necessary", "severity": "warning" }
+        ]
+      },
+      "runtime_checks": {
+        "setup": "update_option('opt_false', false); update_option('opt_one', 'one');",
+        "assertions": [
+          {
+            "type": "custom_assertion",
+            "code": "if ( ! function_exists('wpbp_get_options_cached') ) { return false; } $res = wpbp_get_options_cached( array( 'opt_false', 'opt_one', 'missing_opt' ) ); return array_key_exists('opt_false',$res) && $res['opt_false'] === false && $res['opt_one'] === 'one' && $res['missing_opt'] === null;",
+            "description": "Preserves cached false, fetches existing and missing options",
+            "weight": 1.0
+          }
+        ],
+        "teardown": "delete_option('opt_false'); delete_option('opt_one'); delete_option('missing_opt');"
+      },
+      "judge_config": { "rubric_id": "wp-judge-rubric-v1" },
+      "reference_solution": "function wpbp_get_options_cached( array $keys ): array {\n    $group = 'wpbp-options';\n    $fetched = wp_cache_get_multiple( $keys, $group );\n    $misses  = array();\n    foreach ( $keys as $k ) {\n        if ( ! array_key_exists( $k, $fetched ) ) {\n            $misses[] = $k;\n        }\n    }\n    if ( $misses ) {\n        $fill = array();\n        foreach ( $misses as $k ) {\n            $val       = get_option( $k, null );\n            $fill[ $k ] = $val;\n            $fetched[ $k ] = $val;\n        }\n        wp_cache_set_multiple( $fill, $group );\n    }\n    return $fetched;\n}"
+    },
+    {
+      "id": "e-interactivity-router-replace-001",
+      "category": "interactivity_api",
+      "difficulty": "hard",
+      "prompt": "Create wpbp_router_link($url, $text) that outputs an anchor using the Interactivity API router with history replacement and intent prefetch.",
+      "expected_behavior": "Returns <a> with data-wp-router-replace=\"true\", data-wp-router-prefetch=\"intent\", href set to $url, and inner text.",
+      "requirements": [
+        "Return the HTML string (do not echo)",
+        "Include data-wp-router-replace=\"true\" and data-wp-router-prefetch=\"intent\" attributes",
+        "Escape URL and text",
+        "Include rel=\"nofollow\" when URL is external (scheme not matching home_url scheme/host)"
+      ],
+      "static_checks": {
+        "required_patterns": [
+          { "pattern": "data-wp-router-replace", "description": "Uses router replace attribute", "weight": 1.0 },
+          { "pattern": "data-wp-router-prefetch", "description": "Prefetch intent attribute", "weight": 0.6 },
+          { "pattern": "esc_url", "description": "Escapes URL", "weight": 0.6 }
+        ]
+      },
+      "runtime_checks": {
+        "assertions": [
+          {
+            "type": "custom_assertion",
+            "code": "if ( ! function_exists('wpbp_router_link') ) { return false; } $html = wpbp_router_link( 'https://example.com/path', 'Go' ); return str_contains($html,'data-wp-router-replace=\"true\"') && str_contains($html,'data-wp-router-prefetch=\"intent\"') && str_contains($html,'href=\"https://example.com/path\"') && str_contains($html,'>Go<') && str_contains($html,'rel=\"nofollow\"');",
+            "description": "Has router attrs and rel on external",
+            "weight": 1.0
+          }
+        ]
+      },
+      "judge_config": { "rubric_id": "wp-judge-rubric-v1" },
+      "reference_solution": "function wpbp_router_link( string $url, string $text ): string {\n    $home    = wp_parse_url( home_url() );\n    $target  = wp_parse_url( $url );\n    $is_external = $target && ( ($target['host'] ?? '') !== ($home['host'] ?? '') || ($target['scheme'] ?? '') !== ($home['scheme'] ?? '') );\n    $rel = $is_external ? ' rel=\"nofollow\"' : '';\n    return sprintf(\n        '<a href=\"%s\" data-wp-router-replace=\"true\" data-wp-router-prefetch=\"intent\"%s>%s</a>',\n        esc_url( $url ),\n        $rel,\n        esc_html( $text )\n    );\n}"
     }
   ]
 }
