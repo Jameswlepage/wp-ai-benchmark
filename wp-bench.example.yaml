@@ -1,18 +1,25 @@
-# WP-Bench Configuration Example
-# Copy to wp-bench.yaml and customize for your run
+# WP-Bench Configuration
+# Copy to wp-bench.yaml and customize. API keys loaded from .env file.
 
 dataset:
   source: local          # 'local' or 'huggingface'
   name: wp-core-v1       # suite name or HF dataset path
 
-# Model configuration - uses LiteLLM format
-# See: https://docs.litellm.ai/docs/providers/openai
-model:
-  kind: openai
-  name: gpt-4o           # gpt-4o, gpt-4o-mini, gpt-5.2, o1, o3-mini, etc.
-  temperature: 0.0
-  # max_tokens: 4096     # optional
-  # top_p: 1.0           # optional
+# Multiple models to benchmark (runs sequentially, outputs comparison table)
+models:
+  # OpenAI
+  - name: gpt-4o
+  - name: gpt-4o-mini
+  # Google Gemini
+  - name: gemini/gemini-2.5-pro
+  - name: gemini/gemini-2.5-flash
+  # Anthropic Claude
+  - name: claude-sonnet-4-20250514
+  - name: claude-opus-4-5-20251101
+
+# Or use single model (legacy format):
+# model:
+#   name: gpt-4o
 
 # WordPress runtime grader
 grader:
@@ -22,14 +29,10 @@ grader:
 # Run configuration
 run:
   suite: wp-core-v1
-  limit: 10              # null for all tests
+  # limit: 10            # limit tests per model (null = all)
   concurrency: 4
-  # skip_runtime: false
-  # skip_static: false
-  # skip_judge: false
 
-# Output paths (relative to config file)
+# Output paths
 output:
   path: output/results.json
   jsonl_path: output/results.jsonl
-  save_artifacts_dir: output/artifacts

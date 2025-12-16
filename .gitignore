@@ -13,6 +13,9 @@
 # Local config (copy from wp-bench.example.yaml)
 wp-bench.yaml
 
+# Environment secrets
+.env
+
 # wp-env
 /.wp-env/
 

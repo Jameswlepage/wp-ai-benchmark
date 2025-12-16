@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Literal, Optional
+from typing import List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, HttpUrl, validator
 
@@ -69,10 +69,19 @@ class OutputConfig(BaseModel):
 
 class HarnessConfig(BaseModel):
     dataset: DatasetConfig = DatasetConfig()
-    model: ModelConfig = ModelConfig()
+    model: Optional[ModelConfig] = None  # Single model (legacy)
+    models: Optional[List[ModelConfig]] = None  # Multiple models
     grader: GraderConfig = GraderConfig()
     run: RunConfig = RunConfig()
     output: OutputConfig = OutputConfig()
+
+    def get_models(self) -> List[ModelConfig]:
+        """Return list of models to evaluate."""
+        if self.models:
+            return self.models
+        if self.model:
+            return [self.model]
+        return [ModelConfig()]  # Default
 
     @classmethod
     def from_file(cls, path: Path) -> "HarnessConfig":

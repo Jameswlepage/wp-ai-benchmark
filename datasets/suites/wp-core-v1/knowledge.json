@@ -301,6 +301,215 @@
       "correct_answer": "C",
       "explanation": "WordPress 6.9 ships with a native Accordion block for collapsible sections.",
       "references": ["https://developer.wordpress.org/news/2024/12/wordpress-6-9-beta-1/"]
+    },
+    {
+      "id": "k-abilities-003",
+      "category": "abilities_api",
+      "subcategory": "registration",
+      "difficulty": "hard",
+      "prompt": "Which hook must you use to register ability categories so WordPress 6.9 persists them without a _doing_it_wrong notice?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "init" },
+        { "key": "B", "text": "wp_abilities_api_init" },
+        { "key": "C", "text": "wp_abilities_api_categories_init" },
+        { "key": "D", "text": "rest_api_init" }
+      ],
+      "correct_answer": "C",
+      "explanation": "Categories are validated separately from abilities; WordPress 6.9 only saves them when registered on wp_abilities_api_categories_init.",
+      "references": ["https://make.wordpress.org/core/2025/11/10/abilities-api-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-interactivity-attach-001",
+      "category": "interactivity_api",
+      "difficulty": "hard",
+      "prompt": "In WordPress 6.9, what does the Interactivity API router option attachTo solve?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Persisting server state across page loads" },
+        { "key": "B", "text": "Choosing the DOM parent where a router region renders to avoid collisions" },
+        { "key": "C", "text": "Deferring hydration until window.onload" },
+        { "key": "D", "text": "Forcing interactivity scripts into the footer" }
+      ],
+      "correct_answer": "B",
+      "explanation": "attachTo is a selector telling the router which parent node to render into, preventing conflicting renders when multiple router regions share a page.",
+      "references": ["https://make.wordpress.org/core/2025/11/25/wordpress-6-9-field-guide/"]
+    },
+    {
+      "id": "k-cache-salted-001",
+      "category": "caching",
+      "difficulty": "hard",
+      "prompt": "Which helper should you use to reuse WP_Query cache keys while still invalidating when last_changed updates in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "wp_cache_flush_group()" },
+        { "key": "B", "text": "wp_cache_get_salted() / wp_cache_set_salted()" },
+        { "key": "C", "text": "Define WP_CACHE_KEY_SALT" },
+        { "key": "D", "text": "Set cache_results to false on WP_Query" }
+      ],
+      "correct_answer": "B",
+      "explanation": "New salted cache helpers embed last_changed into stored values so keys can be reused while stale data is rejected.",
+      "references": ["https://make.wordpress.org/core/2025/11/17/consistent-cache-keys-for-query-groups-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-meta-gotcha-001",
+      "category": "gotchas",
+      "difficulty": "hard",
+      "prompt": "What does get_post_meta($post_id, 'missing_key', true) return when the meta key does not exist?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "null" },
+        { "key": "B", "text": "false" },
+        { "key": "C", "text": "An empty string" },
+        { "key": "D", "text": "WP_Error" }
+      ],
+      "correct_answer": "C",
+      "explanation": "With $single=true and no row present, get_post_meta returns an empty string—easy to misread as a real value with loose checks.",
+      "references": ["https://developer.wordpress.org/reference/functions/get_post_meta/"]
+    },
+    {
+      "id": "k-blockprocessor-001",
+      "category": "block_api",
+      "difficulty": "hard",
+      "prompt": "In WordPress 6.9, which WP_Block_Processor method replaced extract_block() to return a parsed block and advance the cursor?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "extract_block()" },
+        { "key": "B", "text": "extract_current_block()" },
+        { "key": "C", "text": "extract_full_block_and_advance()" },
+        { "key": "D", "text": "get_block_and_seek()" }
+      ],
+      "correct_answer": "C",
+      "explanation": "The RC renamed extract_block() to extract_full_block_and_advance() before the 6.9 release; older names now fail.",
+      "references": ["https://make.wordpress.org/core/2025/11/19/introducing-the-streaming-block-parser-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-blockprocessor-attrs-001",
+      "category": "block_api",
+      "difficulty": "hard",
+      "prompt": "When using WP_Block_Processor in 6.9, which method triggers JSON parsing of the current block's attributes (and is intentionally verbose about its cost)?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "get_block_attributes()" },
+        { "key": "B", "text": "allocate_and_return_parsed_attributes()" },
+        { "key": "C", "text": "parse_attributes()" },
+        { "key": "D", "text": "get_attributes_json()" }
+      ],
+      "correct_answer": "B",
+      "explanation": "allocate_and_return_parsed_attributes() is the costly, explicitly named method that parses JSON attributes on demand in WP_Block_Processor.",
+      "references": ["https://make.wordpress.org/core/2025/11/19/introducing-the-streaming-block-parser-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-html-serialize-001",
+      "category": "html_api",
+      "difficulty": "hard",
+      "prompt": "What does WP_HTML_Processor::serialize_token() return now that the method is public in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "The raw substring of the original HTML" },
+        { "key": "B", "text": "A normalized, well‑formed serialization of the currently matched token" },
+        { "key": "C", "text": "Only the tag name of the current element" },
+        { "key": "D", "text": "A DOMDocument node" }
+      ],
+      "correct_answer": "B",
+      "explanation": "serialize_token() emits a fully normalized, well‑formed representation of the current token, useful for safe extraction/rewriting.",
+      "references": ["https://make.wordpress.org/core/2025/11/21/updates-to-the-html-api-in-6-9/"]
+    },
+    {
+      "id": "k-bindings-editor-001",
+      "category": "block_bindings",
+      "difficulty": "hard",
+      "prompt": "How do you expose a custom Block Bindings source in the 6.9 editor UI so its fields appear in the binding dropdown?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Add supports.bindings UI flags to block.json" },
+        { "key": "B", "text": "Provide a getFieldsList() method on the source registration" },
+        { "key": "C", "text": "Register the source on enqueue_block_editor_assets" },
+        { "key": "D", "text": "Set show_in_rest true when registering the source" }
+      ],
+      "correct_answer": "B",
+      "explanation": "6.9 surfaces custom sources in the editor when the registration function returns getFieldsList() with label/type definitions.",
+      "references": ["https://make.wordpress.org/core/2025/11/12/block-bindings-improvements-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-blockhooks-context-001",
+      "category": "block_hooks",
+      "difficulty": "hard",
+      "prompt": "Why might a hooked block fail to appear when a user adds a new anchor block after activating the plugin in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Hooked blocks only work on classic themes" },
+        { "key": "B", "text": "Hooks only fire for dynamic blocks" },
+        { "key": "C", "text": "Hooked blocks are applied to templates present at activation; anchors added later are not auto-filled" },
+        { "key": "D", "text": "Block hooks require a REST request to refresh" }
+      ],
+      "correct_answer": "C",
+      "explanation": "Current block hooks implementation auto-inserts into existing templates at activation time; anchors created afterward are not backfilled, so the hooked block stays missing until manually added.",
+      "references": ["https://core.trac.wordpress.org/ticket/63608"]
+    },
+    {
+      "id": "k-object-cache-found-001",
+      "category": "caching",
+      "difficulty": "hard",
+      "prompt": "When storing falsey values in an object cache group, how do you distinguish a cached false from a cache miss with WordPress 6.9 APIs?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Check is_wp_error() on the return" },
+        { "key": "B", "text": "Inspect the $found out parameter (or miss list in wp_cache_get_multiple*) to see if the key was present" },
+        { "key": "C", "text": "Use wp_cache_exists()" },
+        { "key": "D", "text": "Cache falsey values are not allowed; they are always misses" }
+      ],
+      "correct_answer": "B",
+      "explanation": "WP_Object_Cache::get and wp_cache_get_multiple* report hits through the passed-by-reference $found flag/miss list, allowing false or 0 values to be distinguished from absent keys.",
+      "references": ["https://developer.wordpress.org/reference/classes/wp_object_cache/get/"]
+    },
+    {
+      "id": "k-font-library-disable-001",
+      "category": "font_library",
+      "difficulty": "hard",
+      "prompt": "What is the supported way to hide the Font Library UI across editors in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Remove the Fonts menu via remove_menu_page()" },
+        { "key": "B", "text": "Set fontLibraryEnabled=false in the block_editor_settings_all filter" },
+        { "key": "C", "text": "Define DISABLE_FONT_LIBRARY in wp-config.php" },
+        { "key": "D", "text": "Unregister wp_font_family post type" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Filtering block_editor_settings_all and setting fontLibraryEnabled to false disables the Font Library UI globally without unregistering post types.",
+      "references": ["https://developer.wordpress.org/news/snippets/how-to-disable-the-font-library/"]
+    },
+    {
+      "id": "k-interactivity-module-001",
+      "category": "interactivity_api",
+      "difficulty": "hard",
+      "prompt": "When manually registering a script module for the Interactivity API in WordPress 6.9, how do you mark it as compatible with client navigation so it loads on SPA transitions?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Set supports.interactivity=true in block.json" },
+        { "key": "B", "text": "Pass 'client_navigation' => true to wp_register_script_module()" },
+        { "key": "C", "text": "Call wp_interactivity()->add_client_navigation_support_to_script_module( 'module-id' )" },
+        { "key": "D", "text": "Prefix the handle with 'interactivity-'" }
+      ],
+      "correct_answer": "C",
+      "explanation": "Manually enqueued script modules must be flagged with add_client_navigation_support_to_script_module so router navigation imports them and adds the data-wp-router-options directive.",
+      "references": ["https://make.wordpress.org/core/2025/11/12/interactivity-apis-client-navigation-improvements-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-blockhooks-postcontent-001",
+      "category": "block_hooks",
+      "difficulty": "hard",
+      "prompt": "Why won’t a block hook that targets core/post-content appear inside regular post content in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Block hooks only work on classic themes" },
+        { "key": "B", "text": "Hooks are limited to templates, template parts, and patterns—not per-post content" },
+        { "key": "C", "text": "core/post-content is a static block so hooks are skipped" },
+        { "key": "D", "text": "Hooks require REST context" }
+      ],
+      "correct_answer": "B",
+      "explanation": "Block hooks are applied to theme templates, template parts, and patterns when registered; user-authored post content isn’t rewritten, so the hooked block never appears there.",
+      "references": ["https://make.wordpress.org/core/2023/10/15/introducing-block-hooks-for-dynamic-blocks/"]
     }
   ]
 }
