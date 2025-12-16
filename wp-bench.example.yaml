@@ -1,0 +1,35 @@
+# WP-Bench Configuration Example
+# Copy to wp-bench.yaml and customize for your run
+
+dataset:
+  source: local          # 'local' or 'huggingface'
+  name: wp-core-v1       # suite name or HF dataset path
+
+# Model configuration - uses LiteLLM format
+# See: https://docs.litellm.ai/docs/providers/openai
+model:
+  kind: openai
+  name: gpt-4o           # gpt-4o, gpt-4o-mini, gpt-5.2, o1, o3-mini, etc.
+  temperature: 0.0
+  # max_tokens: 4096     # optional
+  # top_p: 1.0           # optional
+
+# WordPress runtime grader
+grader:
+  kind: docker
+  wp_env_dir: ./runtime  # path to wp-env project
+
+# Run configuration
+run:
+  suite: wp-core-v1
+  limit: 10              # null for all tests
+  concurrency: 4
+  # skip_runtime: false
+  # skip_static: false
+  # skip_judge: false
+
+# Output paths (relative to config file)
+output:
+  path: output/results.json
+  jsonl_path: output/results.jsonl
+  save_artifacts_dir: output/artifacts

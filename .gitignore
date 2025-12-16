@@ -3,6 +3,13 @@
 /node_modules/
 .venv/
 
+# Benchmark outputs
+/output/
+/artifacts/
+
+# Local config (copy from wp-bench.example.yaml)
+wp-bench.yaml
+
 # wp-env
 /.wp-env/
 

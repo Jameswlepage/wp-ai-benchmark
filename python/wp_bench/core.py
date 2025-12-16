@@ -34,9 +34,9 @@ class BenchmarkRunner:
         payload = {
             "metadata": {
                 "suite": self.config.run.suite,
-                "model": self.config.model.dict(),
-                "grader": self.config.grader.dict(),
-                "dataset": self.config.dataset.dict(),
+                "model": self.config.model.model_dump(mode="json"),
+                "grader": self.config.grader.model_dump(mode="json"),
+                "dataset": self.config.dataset.model_dump(mode="json"),
                 "scores": {
                     "knowledge": summary.knowledge,
                     "correctness": summary.correctness,
