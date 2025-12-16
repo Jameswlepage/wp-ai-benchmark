@@ -10,6 +10,9 @@ declare(strict_types=1);
 namespace WordPress\AI_Benchmark;
 
 use JsonException;
+use WordPress\AI_Benchmark\Test\Execution_Test;
+use WordPress\AI_Benchmark\Test\Knowledge_Test;
+use WordPress\AI_Benchmark\Test\Test_Interface;
 
 /**
  * Loads and validates test suites from JSON files.
@@ -23,11 +26,15 @@ class Suite_Loader {
 
 	/**
 	 * Path to tests directory.
+	 *
+	 * @var string
 	 */
 	private string $tests_path;
 
 	/**
 	 * Path to judges directory.
+	 *
+	 * @var string
 	 */
 	private string $judges_path;
 
@@ -65,16 +72,16 @@ class Suite_Loader {
 	 * @param string $suite_name Suite identifier (e.g., 'wp-core-v1').
 	 *
 	 * @return array{
-	 *   knowledge_tests: array<array<string, mixed>>,
-	 *   execution_tests: array<array<string, mixed>>,
+	 *   knowledge_tests: array<Knowledge_Test>,
+	 *   execution_tests: array<Execution_Test>,
 	 *   metadata: array<string, mixed>
 	 * }
 	 *
-	 * @throws \InvalidArgumentException If suite not found.
-	 * @throws JsonException If JSON is invalid.
+	 * @throws \Exception If suite not found or JSON is invalid.
 	 */
 	public function load( string $suite_name ): array {
 		if ( isset( $this->suite_cache[ $suite_name ] ) ) {
+			/** @var array{knowledge_tests: array<Knowledge_Test>, execution_tests: array<Execution_Test>, metadata: array<string, mixed>} */
 			return $this->suite_cache[ $suite_name ];
 		}
 
@@ -90,22 +97,38 @@ class Suite_Loader {
 		if ( file_exists( $knowledge_file ) ) {
 			$knowledge_data = $this->load_json_file( $knowledge_file );
 			$this->validate_knowledge_suite( $knowledge_data );
-			$knowledge_tests = $knowledge_data['tests'];
-			$knowledge_meta  = $knowledge_data['metadata'] ?? [];
+
+			/** @var list<array<string, mixed>> $knowledge_test_data */
+			$knowledge_test_data = $knowledge_data['tests'];
+			$knowledge_tests     = array_map(
+				static fn( array $data ): Knowledge_Test => Knowledge_Test::from_array( $data ),
+				$knowledge_test_data
+			);
+
+			$meta_value     = $knowledge_data['metadata'] ?? [];
+			$knowledge_meta = is_array( $meta_value ) ? $meta_value : [];
 		}
 
 		// Load execution tests if file exists.
 		if ( file_exists( $execution_file ) ) {
 			$execution_data = $this->load_json_file( $execution_file );
 			$this->validate_execution_suite( $execution_data );
-			$execution_tests = $execution_data['tests'];
-			$execution_meta  = $execution_data['metadata'] ?? [];
+
+			/** @var list<array<string, mixed>> $execution_test_data */
+			$execution_test_data = $execution_data['tests'];
+			$execution_tests     = array_map(
+				static fn( array $data ): Execution_Test => Execution_Test::from_array( $data ),
+				$execution_test_data
+			);
+
+			$meta_value     = $execution_data['metadata'] ?? [];
+			$execution_meta = is_array( $meta_value ) ? $meta_value : [];
 		}
 
 		// Ensure at least one type exists.
 		if ( empty( $knowledge_tests ) && empty( $execution_tests ) ) {
 			throw new \InvalidArgumentException(
-				sprintf( "Suite '%s' not found or contains no tests.", $suite_name )
+				sprintf( "Suite '%s' not found or contains no tests.", esc_html( $suite_name ) )
 			);
 		}
 
@@ -143,18 +166,25 @@ class Suite_Loader {
 
 		// Scan knowledge directory.
 		$knowledge_pattern = $this->tests_path . 'knowledge/*.json';
-		foreach ( glob( $knowledge_pattern ) ?: [] as $file ) {
+		$knowledge_files   = glob( $knowledge_pattern );
+		foreach ( false !== $knowledge_files ? $knowledge_files : [] as $file ) {
 			$name          = basename( $file, '.json' );
 			$seen[ $name ] = true;
 
 			try {
 				$data            = $this->load_json_file( $file );
+				$tests           = $data['tests'] ?? [];
+				$tests_count     = is_array( $tests ) ? count( $tests ) : 0;
+				$metadata        = $data['metadata'] ?? [];
+				$description     = is_array( $metadata ) && isset( $metadata['description'] ) && is_string( $metadata['description'] )
+					? $metadata['description']
+					: '';
 				$suites[ $name ] = [
 					'name'            => $name,
 					'types'           => [ 'knowledge' ],
-					'knowledge_count' => count( $data['tests'] ?? [] ),
+					'knowledge_count' => $tests_count,
 					'execution_count' => 0,
-					'description'     => $data['metadata']['description'] ?? '',
+					'description'     => $description,
 				];
 			} catch ( \Throwable $e ) {
 				// Skip invalid files.
@@ -164,12 +194,18 @@ class Suite_Loader {
 
 		// Scan execution directory and merge.
 		$execution_pattern = $this->tests_path . 'execution/*.json';
-		foreach ( glob( $execution_pattern ) ?: [] as $file ) {
+		$execution_files   = glob( $execution_pattern );
+		foreach ( false !== $execution_files ? $execution_files : [] as $file ) {
 			$name = basename( $file, '.json' );
 
 			try {
-				$data       = $this->load_json_file( $file );
-				$exec_count = count( $data['tests'] ?? [] );
+				$data        = $this->load_json_file( $file );
+				$tests       = $data['tests'] ?? [];
+				$exec_count  = is_array( $tests ) ? count( $tests ) : 0;
+				$metadata    = $data['metadata'] ?? [];
+				$description = is_array( $metadata ) && isset( $metadata['description'] ) && is_string( $metadata['description'] )
+					? $metadata['description']
+					: '';
 
 				if ( isset( $seen[ $name ] ) ) {
 					// Merge with existing suite.
@@ -181,7 +217,7 @@ class Suite_Loader {
 						'types'           => [ 'execution' ],
 						'knowledge_count' => 0,
 						'execution_count' => $exec_count,
-						'description'     => $data['metadata']['description'] ?? '',
+						'description'     => $description,
 					];
 				}
 			} catch ( \Throwable $e ) {
@@ -198,21 +234,30 @@ class Suite_Loader {
 	 *
 	 * @param string $test_id Test identifier.
 	 *
-	 * @return array{type: string, data: array<string, mixed>, suite: string}
+	 * @return array{type: string, test: Test_Interface, suite: string}
 	 *
 	 * @throws \InvalidArgumentException If test not found.
 	 */
 	public function find_test_by_id( string $test_id ): array {
 		// Search knowledge tests.
-		$knowledge_pattern = $this->tests_path . 'knowledge/*.json';
-		foreach ( glob( $knowledge_pattern ) ?: [] as $file ) {
+		$knowledge_pattern   = $this->tests_path . 'knowledge/*.json';
+		$knowledge_files_arr = glob( $knowledge_pattern );
+		foreach ( false !== $knowledge_files_arr ? $knowledge_files_arr : [] as $file ) {
 			try {
-				$data = $this->load_json_file( $file );
-				foreach ( $data['tests'] ?? [] as $test ) {
-					if ( ( $test['id'] ?? '' ) === $test_id ) {
+				$data  = $this->load_json_file( $file );
+				$tests = $data['tests'] ?? [];
+				if ( ! is_array( $tests ) ) {
+					continue;
+				}
+				foreach ( $tests as $test_data ) {
+					if ( ! is_array( $test_data ) ) {
+						continue;
+					}
+					$id = $test_data['id'] ?? '';
+					if ( is_string( $id ) && $test_id === $id ) {
 						return [
 							'type'  => 'knowledge',
-							'data'  => $test,
+							'test'  => Knowledge_Test::from_array( $test_data ),
 							'suite' => basename( $file, '.json' ),
 						];
 					}
@@ -223,15 +268,24 @@ class Suite_Loader {
 		}
 
 		// Search execution tests.
-		$execution_pattern = $this->tests_path . 'execution/*.json';
-		foreach ( glob( $execution_pattern ) ?: [] as $file ) {
+		$execution_pattern   = $this->tests_path . 'execution/*.json';
+		$execution_files_arr = glob( $execution_pattern );
+		foreach ( false !== $execution_files_arr ? $execution_files_arr : [] as $file ) {
 			try {
-				$data = $this->load_json_file( $file );
-				foreach ( $data['tests'] ?? [] as $test ) {
-					if ( ( $test['id'] ?? '' ) === $test_id ) {
+				$data  = $this->load_json_file( $file );
+				$tests = $data['tests'] ?? [];
+				if ( ! is_array( $tests ) ) {
+					continue;
+				}
+				foreach ( $tests as $test_data ) {
+					if ( ! is_array( $test_data ) ) {
+						continue;
+					}
+					$id = $test_data['id'] ?? '';
+					if ( is_string( $id ) && $test_id === $id ) {
 						return [
 							'type'  => 'execution',
-							'data'  => $test,
+							'test'  => Execution_Test::from_array( $test_data ),
 							'suite' => basename( $file, '.json' ),
 						];
 					}
@@ -285,14 +339,23 @@ class Suite_Loader {
 	public function list_rubrics(): array {
 		$rubrics = [];
 		$pattern = $this->judges_path . '*.json';
+		$files   = glob( $pattern );
 
-		foreach ( glob( $pattern ) ?: [] as $file ) {
+		foreach ( false !== $files ? $files : [] as $file ) {
 			try {
-				$data      = $this->load_json_file( $file );
-				$rubrics[] = [
-					'id'          => basename( $file, '.json' ),
-					'name'        => $data['metadata']['name'] ?? basename( $file, '.json' ),
-					'description' => $data['metadata']['description'] ?? '',
+				$data        = $this->load_json_file( $file );
+				$metadata    = $data['metadata'] ?? [];
+				$default_id  = basename( $file, '.json' );
+				$name        = is_array( $metadata ) && isset( $metadata['name'] ) && is_string( $metadata['name'] )
+					? $metadata['name']
+					: $default_id;
+				$description = is_array( $metadata ) && isset( $metadata['description'] ) && is_string( $metadata['description'] )
+					? $metadata['description']
+					: '';
+				$rubrics[]   = [
+					'id'          => $default_id,
+					'name'        => $name,
+					'description' => $description,
 				];
 			} catch ( \Throwable $e ) {
 				continue;
@@ -314,12 +377,12 @@ class Suite_Loader {
 		$categories = [];
 
 		foreach ( $suite['knowledge_tests'] as $test ) {
-			$cat                = $test['category'] ?? 'uncategorized';
+			$cat                = $test->get_category();
 			$categories[ $cat ] = ( $categories[ $cat ] ?? 0 ) + 1;
 		}
 
 		foreach ( $suite['execution_tests'] as $test ) {
-			$cat                = $test['category'] ?? 'uncategorized';
+			$cat                = $test->get_category();
 			$categories[ $cat ] = ( $categories[ $cat ] ?? 0 ) + 1;
 		}
 
@@ -334,18 +397,26 @@ class Suite_Loader {
 	 * @return array<string, mixed> Decoded JSON data.
 	 *
 	 * @throws JsonException If JSON is invalid.
-	 * @throws \RuntimeException If file cannot be read.
+	 * @throws \RuntimeException If file cannot be read or decoded data is not an array.
 	 */
 	private function load_json_file( string $path ): array {
 		$content = file_get_contents( $path );
 
-		if ( $content === false ) {
+		if ( false === $content ) {
 			throw new \RuntimeException(
-				sprintf( 'Cannot read file: %s', $path )
+				sprintf( 'Cannot read file: %s', esc_html( $path ) )
 			);
 		}
 
-		return json_decode( $content, true, 512, JSON_THROW_ON_ERROR );
+		$decoded = json_decode( $content, true, 512, JSON_THROW_ON_ERROR );
+
+		if ( ! is_array( $decoded ) ) {
+			throw new \RuntimeException(
+				sprintf( 'JSON file must contain an object or array: %s', esc_html( $path ) )
+			);
+		}
+
+		return $decoded;
 	}
 
 	/**
@@ -368,15 +439,15 @@ class Suite_Loader {
 			foreach ( $required as $field ) {
 				if ( ! isset( $test[ $field ] ) ) {
 					throw new \InvalidArgumentException(
-						sprintf( 'Knowledge test %d missing required field: %s', $i, $field )
+						sprintf( 'Knowledge test %s missing required field: %s', esc_html( (string) $i ), esc_html( $field ) )
 					);
 				}
 			}
 
 			// Multiple choice requires choices.
-			if ( $test['type'] === 'multiple_choice' && ! isset( $test['choices'] ) ) {
+			if ( 'multiple_choice' === $test['type'] && ! isset( $test['choices'] ) ) {
 				throw new \InvalidArgumentException(
-					sprintf( "Multiple choice test %d missing 'choices' field.", $i )
+					sprintf( "Multiple choice test %s missing 'choices' field.", esc_html( (string) $i ) )
 				);
 			}
 		}
@@ -402,7 +473,7 @@ class Suite_Loader {
 			foreach ( $required as $field ) {
 				if ( ! isset( $test[ $field ] ) ) {
 					throw new \InvalidArgumentException(
-						sprintf( 'Execution test %d missing required field: %s', $i, $field )
+						sprintf( 'Execution test %s missing required field: %s', esc_html( (string) $i ), esc_html( $field ) )
 					);
 				}
 			}
@@ -429,7 +500,7 @@ class Suite_Loader {
 			foreach ( $required as $field ) {
 				if ( ! isset( $criterion[ $field ] ) ) {
 					throw new \InvalidArgumentException(
-						sprintf( 'Rubric criterion %d missing required field: %s', $i, $field )
+						sprintf( 'Rubric criterion %s missing required field: %s', esc_html( (string) $i ), esc_html( $field ) )
 					);
 				}
 			}

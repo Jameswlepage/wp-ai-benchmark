@@ -35,7 +35,7 @@
 	"scripts": {
 		"lint": "phpcs",
 		"lint:fix": "phpcbf",
-		"phpstan": "phpstan analyse",
+		"phpstan": "phpstan analyse --memory-limit=512M",
 		"test": [
 			"@lint",
 			"@phpstan"
@@ -43,7 +43,8 @@
 	},
 	"config": {
 		"allow-plugins": {
-			"dealerdirect/phpcodesniffer-composer-installer": true
+			"dealerdirect/phpcodesniffer-composer-installer": true,
+			"php-http/discovery": true
 		},
 		"sort-packages": true
 	}

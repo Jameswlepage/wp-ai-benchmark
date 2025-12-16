@@ -39,8 +39,10 @@ class Model_Client {
 	 *
 	 * @return string Generated text response.
 	 *
-	 * @throws \RuntimeException On API errors or unavailable model.
-	 * @throws \InvalidArgumentException On invalid model format.
+	 * @throws \RuntimeException         On API errors or unavailable model.
+	 * @throws \InvalidArgumentException On invalid model format via parse_model_string().
+	 *
+	 * @phpcs:ignore Squiz.Commenting.FunctionCommentThrowTag.WrongNumber -- Both exceptions are thrown.
 	 */
 	public function generate(
 		string $prompt,
@@ -59,7 +61,7 @@ class Model_Client {
 			->using_temperature( $temperature );
 
 		// Add JSON schema if provided.
-		if ( $json_schema !== null ) {
+		if ( null !== $json_schema ) {
 			$builder = $builder->as_json_response( $json_schema );
 		}
 
@@ -68,7 +70,7 @@ class Model_Client {
 			throw new \RuntimeException(
 				sprintf(
 					'Model %s is not available for text generation. Check provider credentials in Settings > AI Credentials.',
-					$model
+					esc_html( $model )
 				)
 			);
 		}
@@ -93,8 +95,9 @@ class Model_Client {
 			}
 		}
 
+		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception chaining, not output.
 		throw new \RuntimeException(
-			'AI generation failed: ' . $last_exception->getMessage(),
+			'AI generation failed: ' . esc_html( $last_exception->getMessage() ),
 			0,
 			$last_exception
 		);
@@ -125,10 +128,16 @@ class Model_Client {
 
 		try {
 			$decoded = json_decode( $response, true, 512, JSON_THROW_ON_ERROR );
+
+			if ( ! is_array( $decoded ) ) {
+				throw new \RuntimeException( 'JSON response must be an object or array' );
+			}
+
 			return $decoded;
 		} catch ( \JsonException $e ) {
+			// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- Exception chaining, not output.
 			throw new \RuntimeException(
-				'Failed to parse JSON response: ' . $e->getMessage(),
+				'Failed to parse JSON response: ' . esc_html( $e->getMessage() ),
 				0,
 				$e
 			);
@@ -184,11 +193,11 @@ class Model_Client {
 	private function parse_model_string( string $model ): array {
 		$parts = explode( ':', $model, 2 );
 
-		if ( count( $parts ) !== 2 || empty( $parts[0] ) || empty( $parts[1] ) ) {
+		if ( 2 !== count( $parts ) || empty( $parts[0] ) || empty( $parts[1] ) ) {
 			throw new \InvalidArgumentException(
 				sprintf(
 					"Invalid model format '%s'. Expected 'provider:model' (e.g., 'openai:gpt-4.1')",
-					$model
+					esc_html( $model )
 				)
 			);
 		}

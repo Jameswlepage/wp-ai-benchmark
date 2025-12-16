@@ -2,16 +2,14 @@
 /**
  * Test result value object.
  *
- * @package WordPress\AI_Benchmark
- *
- * @phpstan-type StaticDetails array{score: float, checks: array<string, array{passed: bool, weight: float, message?: string}>}
- * @phpstan-type RuntimeDetails array{score: float, checks: array<string, array{passed: bool, message?: string}>}
- * @phpstan-type JudgeDetails array{score: float, criteria_scores?: array<string, float>, feedback?: string}
+ * @package WordPress\AI_Benchmark\Result
  */
 
 declare(strict_types=1);
 
-namespace WordPress\AI_Benchmark;
+namespace WordPress\AI_Benchmark\Result;
+
+use WordPress\AI_Benchmark\Test\Enum\Test_Type;
 
 /**
  * Value object representing the result of a single benchmark test.
@@ -19,60 +17,82 @@ namespace WordPress\AI_Benchmark;
  * Supports both knowledge tests (simple score) and execution tests
  * (static, runtime, and quality scores).
  */
-class Test_Result {
+final class Test_Result {
 
 	/**
 	 * Test identifier.
+	 *
+	 * @var string
 	 */
-	private string $test_id;
+	private readonly string $test_id;
 
 	/**
-	 * Test type: 'knowledge' or 'execution'.
+	 * Test type.
+	 *
+	 * @var Test_Type
 	 */
-	private string $type;
+	private readonly Test_Type $type;
 
 	/**
 	 * Test category (e.g., 'hooks', 'shortcodes').
+	 *
+	 * @var string
 	 */
 	private string $category = '';
 
 	/**
 	 * Run number for multi-run benchmarks.
+	 *
+	 * @var int
 	 */
 	private int $run_number = 1;
 
 	/**
 	 * Knowledge test score (0.0 or 1.0).
+	 *
+	 * @var float|null
 	 */
 	private ?float $score = null;
 
 	/**
 	 * Model's answer for knowledge tests.
+	 *
+	 * @var string|null
 	 */
 	private ?string $model_answer = null;
 
 	/**
 	 * Correct answer for knowledge tests.
+	 *
+	 * @var string|null
 	 */
 	private ?string $correct_answer = null;
 
 	/**
 	 * Generated code for execution tests.
+	 *
+	 * @var string|null
 	 */
 	private ?string $generated_code = null;
 
 	/**
 	 * Static analysis score (0.0-1.0).
+	 *
+	 * @var float|null
 	 */
 	private ?float $static_score = null;
 
 	/**
 	 * Runtime verification score (0.0-1.0).
+	 *
+	 * @var float|null
 	 */
 	private ?float $runtime_score = null;
 
 	/**
 	 * AI judge quality score (0.0-1.0).
+	 *
+	 * @var float|null
 	 */
 	private ?float $quality_score = null;
 
@@ -99,28 +119,25 @@ class Test_Result {
 
 	/**
 	 * Error message if test failed.
+	 *
+	 * @var string|null
 	 */
 	private ?string $error = null;
 
 	/**
 	 * Test duration in milliseconds.
+	 *
+	 * @var float
 	 */
 	private float $duration_ms = 0.0;
 
 	/**
-	 * Additional metadata.
-	 *
-	 * @var array<string, mixed>
-	 */
-	private array $metadata = [];
-
-	/**
 	 * Constructor.
 	 *
-	 * @param string $test_id Test identifier.
-	 * @param string $type    Test type ('knowledge' or 'execution').
+	 * @param string    $test_id Test identifier.
+	 * @param Test_Type $type    Test type.
 	 */
-	public function __construct( string $test_id, string $type ) {
+	public function __construct( string $test_id, Test_Type $type ) {
 		$this->test_id = $test_id;
 		$this->type    = $type;
 	}
@@ -143,7 +160,7 @@ class Test_Result {
 		string $correct_answer,
 		string $category = '',
 	): self {
-		$result                 = new self( $test_id, 'knowledge' );
+		$result                 = new self( $test_id, Test_Type::KNOWLEDGE );
 		$result->score          = $score;
 		$result->model_answer   = $model_answer;
 		$result->correct_answer = $correct_answer;
@@ -178,7 +195,7 @@ class Test_Result {
 		array $judge_details = [],
 		string $category = '',
 	): self {
-		$result                  = new self( $test_id, 'execution' );
+		$result                  = new self( $test_id, Test_Type::EXECUTION );
 		$result->generated_code  = $generated_code;
 		$result->static_score    = $static_score;
 		$result->runtime_score   = $runtime_score;
@@ -194,16 +211,16 @@ class Test_Result {
 	/**
 	 * Create an error result.
 	 *
-	 * @param string $test_id  Test identifier.
-	 * @param string $type     Test type.
-	 * @param string $error    Error message.
-	 * @param string $category Test category.
+	 * @param string    $test_id  Test identifier.
+	 * @param Test_Type $type     Test type.
+	 * @param string    $error    Error message.
+	 * @param string    $category Test category.
 	 *
 	 * @return self
 	 */
 	public static function error_result(
 		string $test_id,
-		string $type,
+		Test_Type $type,
 		string $error,
 		string $category = '',
 	): self {
@@ -219,6 +236,28 @@ class Test_Result {
 	}
 
 	/**
+	 * Create an error result from type string.
+	 *
+	 * Helper for backwards compatibility with string type values.
+	 *
+	 * @param string $test_id     Test identifier.
+	 * @param string $type_string Test type string ('knowledge' or 'execution').
+	 * @param string $error       Error message.
+	 * @param string $category    Test category.
+	 *
+	 * @return self
+	 */
+	public static function error_result_from_string(
+		string $test_id,
+		string $type_string,
+		string $error,
+		string $category = '',
+	): self {
+		$type = Test_Type::tryFrom( $type_string ) ?? Test_Type::KNOWLEDGE;
+		return self::error_result( $test_id, $type, $error, $category );
+	}
+
+	/**
 	 * Get the test ID.
 	 *
 	 * @return string
@@ -228,12 +267,39 @@ class Test_Result {
 	}
 
 	/**
-	 * Get the test type.
+	 * Get the test type as string.
 	 *
 	 * @return string 'knowledge' or 'execution'
 	 */
 	public function get_type(): string {
+		return $this->type->value;
+	}
+
+	/**
+	 * Get the test type enum.
+	 *
+	 * @return Test_Type
+	 */
+	public function get_test_type(): Test_Type {
 		return $this->type;
+	}
+
+	/**
+	 * Check if this is a knowledge test result.
+	 *
+	 * @return bool
+	 */
+	public function is_knowledge(): bool {
+		return Test_Type::KNOWLEDGE === $this->type;
+	}
+
+	/**
+	 * Check if this is an execution test result.
+	 *
+	 * @return bool
+	 */
+	public function is_execution(): bool {
+		return Test_Type::EXECUTION === $this->type;
 	}
 
 	/**
@@ -328,7 +394,7 @@ class Test_Result {
 	 * @return bool
 	 */
 	public function has_error(): bool {
-		return $this->error !== null;
+		return null !== $this->error;
 	}
 
 	/**
@@ -422,18 +488,6 @@ class Test_Result {
 	}
 
 	/**
-	 * Set additional metadata.
-	 *
-	 * @param array<string, mixed> $metadata Metadata array.
-	 *
-	 * @return self
-	 */
-	public function set_metadata( array $metadata ): self {
-		$this->metadata = $metadata;
-		return $this;
-	}
-
-	/**
 	 * Convert to array for serialization.
 	 *
 	 * @return array<string, mixed>
@@ -441,14 +495,14 @@ class Test_Result {
 	public function to_array(): array {
 		$base = [
 			'test_id'     => $this->test_id,
-			'type'        => $this->type,
+			'type'        => $this->type->value,
 			'category'    => $this->category,
 			'run_number'  => $this->run_number,
 			'duration_ms' => $this->duration_ms,
 			'error'       => $this->error,
 		];
 
-		if ( $this->type === 'knowledge' ) {
+		if ( Test_Type::KNOWLEDGE === $this->type ) {
 			return array_merge(
 				$base,
 				[
@@ -482,6 +536,7 @@ class Test_Result {
 	 * @return string
 	 */
 	public function to_json( int $flags = 0 ): string {
-		return wp_json_encode( $this->to_array(), $flags ) ?: '{}';
+		$encoded = wp_json_encode( $this->to_array(), $flags );
+		return false !== $encoded ? $encoded : '{}';
 	}
 }

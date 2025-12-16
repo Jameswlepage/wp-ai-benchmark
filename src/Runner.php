@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 namespace WordPress\AI_Benchmark;
 
+use WordPress\AI_Benchmark\Result\Test_Result;
+use WordPress\AI_Benchmark\Test\Execution_Test;
+use WordPress\AI_Benchmark\Test\Knowledge_Test;
+
 /**
  * Orchestrates benchmark execution across test suites.
  *
@@ -19,21 +23,22 @@ class Runner {
 
 	/**
 	 * Suite loader.
+	 *
+	 * @var Suite_Loader
 	 */
 	private Suite_Loader $suite_loader;
 
 	/**
-	 * Model client.
-	 */
-	private Model_Client $model_client;
-
-	/**
 	 * Knowledge test executor.
+	 *
+	 * @var Executor_Knowledge
 	 */
 	private Executor_Knowledge $knowledge_executor;
 
 	/**
 	 * Execution test executor.
+	 *
+	 * @var Executor_Execution
 	 */
 	private Executor_Execution $execution_executor;
 
@@ -63,7 +68,6 @@ class Runner {
 		?Executor_Execution $execution_executor = null,
 	) {
 		$this->suite_loader       = $suite_loader;
-		$this->model_client       = $model_client;
 		$this->knowledge_executor = $knowledge_executor ?? new Executor_Knowledge( $model_client );
 		$this->execution_executor = $execution_executor ?? new Executor_Execution( $model_client );
 	}
@@ -183,13 +187,19 @@ class Runner {
 		string $model,
 		string $judge_model,
 	): Test_Result {
-		$test = $this->suite_loader->find_test_by_id( $test_id );
+		$test_info = $this->suite_loader->find_test_by_id( $test_id );
 
-		if ( $test['type'] === 'knowledge' ) {
-			return $this->knowledge_executor->execute( $test['data'], $model );
+		if ( 'knowledge' === $test_info['type'] ) {
+			// phpcs:ignore Generic.Commenting.DocComment.MissingShort -- Type hint.
+			/** @var Knowledge_Test $test */
+			$test = $test_info['test'];
+			return $this->knowledge_executor->execute( $test, $model );
 		}
 
-		return $this->execution_executor->execute( $test['data'], $model, $judge_model );
+		// phpcs:ignore Generic.Commenting.DocComment.MissingShort -- Type hint.
+		/** @var Execution_Test $test */
+		$test = $test_info['test'];
+		return $this->execution_executor->execute( $test, $model, $judge_model );
 	}
 
 	/**
@@ -243,8 +253,9 @@ class Runner {
 		$categories = [];
 
 		foreach ( $results as $result ) {
-			$category = $result->get_category() ?: 'uncategorized';
-			$type     = $result->get_type();
+			$category_val = $result->get_category();
+			$category     = '' !== $category_val ? $category_val : 'uncategorized';
+			$type         = $result->get_type();
 
 			if ( ! isset( $categories[ $category ] ) ) {
 				$categories[ $category ] = [
@@ -289,11 +300,12 @@ class Runner {
 	 * Calculate statistics for multiple runs.
 	 *
 	 * @param array<Test_Result> $results All results across runs.
-	 * @param int                $runs    Number of runs.
+	 * @param int                $runs    Number of runs (unused, kept for API compatibility).
 	 *
 	 * @return array<string, array{mean: float, stddev: float, min: float, max: float, runs: int}>
 	 */
 	private function calculate_stats( array $results, int $runs ): array {
+		unset( $runs ); // Unused parameter, kept for API compatibility.
 		// Group results by test ID.
 		$by_test = [];
 		foreach ( $results as $result ) {

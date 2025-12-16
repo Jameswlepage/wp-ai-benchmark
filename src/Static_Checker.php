@@ -33,52 +33,68 @@ class Static_Checker {
 
 		// Check required patterns.
 		$required = $checks['required_patterns'] ?? [];
-		foreach ( $required as $pattern_config ) {
-			$pattern     = $pattern_config['pattern'];
-			$description = $pattern_config['description'] ?? $pattern;
-			$weight      = (float) ( $pattern_config['weight'] ?? 1.0 );
+		if ( is_array( $required ) ) {
+			foreach ( $required as $pattern_config ) {
+				if ( ! is_array( $pattern_config ) ) {
+					continue;
+				}
+				$pattern_value     = $pattern_config['pattern'] ?? '';
+				$pattern           = is_string( $pattern_value ) ? $pattern_value : '';
+				$description_value = $pattern_config['description'] ?? $pattern;
+				$description       = is_string( $description_value ) ? $description_value : $pattern;
+				$weight_value      = $pattern_config['weight'] ?? 1.0;
+				$weight            = is_numeric( $weight_value ) ? (float) $weight_value : 1.0;
 
-			$total_weight += $weight;
-			$found         = $this->safe_preg_match( $pattern, $code );
+				$total_weight += $weight;
+				$found         = $this->safe_preg_match( $pattern, $code );
 
-			$required_results[] = [
-				'pattern'     => $pattern,
-				'description' => $description,
-				'found'       => $found,
-				'weight'      => $weight,
-			];
+				$required_results[] = [
+					'pattern'     => $pattern,
+					'description' => $description,
+					'found'       => $found,
+					'weight'      => $weight,
+				];
 
-			if ( $found ) {
-				$earned_weight += $weight;
+				if ( $found ) {
+					$earned_weight += $weight;
+				}
 			}
 		}
 
 		// Check forbidden patterns.
 		$forbidden = $checks['forbidden_patterns'] ?? [];
-		foreach ( $forbidden as $pattern_config ) {
-			$pattern     = $pattern_config['pattern'];
-			$description = $pattern_config['description'] ?? $pattern;
-			$severity    = $pattern_config['severity'] ?? 'error';
+		if ( is_array( $forbidden ) ) {
+			foreach ( $forbidden as $pattern_config ) {
+				if ( ! is_array( $pattern_config ) ) {
+					continue;
+				}
+				$pattern_value     = $pattern_config['pattern'] ?? '';
+				$pattern           = is_string( $pattern_value ) ? $pattern_value : '';
+				$description_value = $pattern_config['description'] ?? $pattern;
+				$description       = is_string( $description_value ) ? $description_value : $pattern;
+				$severity_value    = $pattern_config['severity'] ?? 'error';
+				$severity          = is_string( $severity_value ) ? $severity_value : 'error';
 
-			$found = $this->safe_preg_match( $pattern, $code );
+				$found = $this->safe_preg_match( $pattern, $code );
 
-			$forbidden_results[] = [
-				'pattern'     => $pattern,
-				'description' => $description,
-				'found'       => $found,
-				'severity'    => $severity,
-			];
-
-			// Forbidden patterns with 'error' severity set score to 0 if found.
-			if ( $found && $severity === 'error' ) {
-				return [
-					'score'   => 0.0,
-					'details' => [
-						'required'       => $required_results,
-						'forbidden'      => $forbidden_results,
-						'failure_reason' => "Forbidden pattern found: {$description}",
-					],
+				$forbidden_results[] = [
+					'pattern'     => $pattern,
+					'description' => $description,
+					'found'       => $found,
+					'severity'    => $severity,
 				];
+
+				// Forbidden patterns with 'error' severity set score to 0 if found.
+				if ( $found && 'error' === $severity ) {
+					return [
+						'score'   => 0.0,
+						'details' => [
+							'required'       => $required_results,
+							'forbidden'      => $forbidden_results,
+							'failure_reason' => "Forbidden pattern found: {$description}",
+						],
+					];
+				}
 			}
 		}
 
@@ -115,18 +131,9 @@ class Static_Checker {
 		set_error_handler( fn() => null );
 
 		try {
-			$tokens = @token_get_all( $code );
+			// token_get_all will trigger errors on invalid syntax.
+			@token_get_all( $code );
 			restore_error_handler();
-
-			// Check for any error tokens.
-			foreach ( $tokens as $token ) {
-				if ( is_array( $token ) && $token[0] === T_BAD_CHARACTER ) {
-					return [
-						'valid' => false,
-						'error' => 'Invalid character in code',
-					];
-				}
-			}
 
 			return [
 				'valid' => true,
@@ -159,14 +166,14 @@ class Static_Checker {
 		// Check forbidden security patterns.
 		foreach ( $patterns['forbidden'] as $pattern_config ) {
 			if ( $this->safe_preg_match( $pattern_config['pattern'], $code ) ) {
-				$severity = $pattern_config['severity'] ?? 'error';
+				$severity = $pattern_config['severity'];
 				$issues[] = [
 					'type'        => 'security',
 					'severity'    => $severity,
 					'description' => $pattern_config['description'],
 				];
 
-				if ( $severity === 'error' ) {
+				if ( 'error' === $severity ) {
 					$deductions += 0.5;
 				} else {
 					$deductions += 0.1;
@@ -210,7 +217,7 @@ class Static_Checker {
 		try {
 			$result = preg_match( $pattern, $subject );
 			restore_error_handler();
-			return $result === 1;
+			return 1 === $result;
 		} catch ( \Throwable $e ) {
 			restore_error_handler();
 			return false;

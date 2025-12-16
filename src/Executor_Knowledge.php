@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 namespace WordPress\AI_Benchmark;
 
+use WordPress\AI_Benchmark\Result\Test_Result;
+use WordPress\AI_Benchmark\Test\Knowledge_Test;
+use WordPress\AI_Benchmark\Test\Enum\Test_Type;
+
 /**
  * Executes MMLU-style knowledge tests.
  *
@@ -19,6 +23,8 @@ class Executor_Knowledge {
 
 	/**
 	 * Model client for AI requests.
+	 *
+	 * @var Model_Client
 	 */
 	private Model_Client $model_client;
 
@@ -34,12 +40,12 @@ class Executor_Knowledge {
 	/**
 	 * Execute a knowledge test.
 	 *
-	 * @param array<string, mixed> $test  Test definition.
-	 * @param string               $model Model identifier (e.g., 'openai:gpt-4.1').
+	 * @param Knowledge_Test $test  Test definition.
+	 * @param string         $model Model identifier (e.g., 'openai:gpt-4.1').
 	 *
 	 * @return Test_Result
 	 */
-	public function execute( array $test, string $model ): Test_Result {
+	public function execute( Knowledge_Test $test, string $model ): Test_Result {
 		$start = microtime( true );
 
 		try {
@@ -50,23 +56,23 @@ class Executor_Knowledge {
 				temperature: 0.0,
 			);
 
-			$model_answer = $this->extract_answer( $response, $test['type'] );
+			$model_answer = $this->extract_answer( $response, $test->get_question_type() );
 			$score        = $this->score_answer( $model_answer, $test );
 
 			$result = Test_Result::knowledge_result(
-				test_id: $test['id'],
+				test_id: $test->get_id(),
 				score: $score,
 				model_answer: $model_answer,
-				correct_answer: $test['correct_answer'],
-				category: $test['category'] ?? '',
+				correct_answer: $test->get_correct_answer(),
+				category: $test->get_category(),
 			);
 
 		} catch ( \Throwable $e ) {
 			$result = Test_Result::error_result(
-				test_id: $test['id'],
-				type: 'knowledge',
+				test_id: $test->get_id(),
+				type: Test_Type::KNOWLEDGE,
 				error: $e->getMessage(),
-				category: $test['category'] ?? '',
+				category: $test->get_category(),
 			);
 		}
 
@@ -78,19 +84,22 @@ class Executor_Knowledge {
 	/**
 	 * Build the prompt for a knowledge test.
 	 *
-	 * @param array<string, mixed> $test Test definition.
+	 * @param Knowledge_Test $test Test definition.
 	 *
 	 * @return string Complete prompt.
 	 */
-	private function build_prompt( array $test ): string {
-		$prompt = $test['prompt'];
+	private function build_prompt( Knowledge_Test $test ): string {
+		$prompt = $test->get_prompt();
 
-		if ( $test['type'] === 'multiple_choice' && isset( $test['choices'] ) ) {
-			$prompt .= "\n\n";
-			foreach ( $test['choices'] as $choice ) {
-				$prompt .= "{$choice['key']}. {$choice['text']}\n";
+		if ( $test->is_multiple_choice() ) {
+			$choices = $test->get_choices();
+			if ( null !== $choices ) {
+				$prompt .= "\n\n";
+				foreach ( $choices as $choice ) {
+					$prompt .= "{$choice['key']}. {$choice['text']}\n";
+				}
+				$prompt .= "\nAnswer with only the letter (A, B, C, or D) corresponding to the correct answer. Do not include any explanation.";
 			}
-			$prompt .= "\nAnswer with only the letter (A, B, C, or D) corresponding to the correct answer. Do not include any explanation.";
 		} else {
 			$prompt .= "\n\nProvide a concise, direct answer. Do not include explanations or additional context.";
 		}
@@ -109,15 +118,15 @@ class Executor_Knowledge {
 	private function extract_answer( string $response, string $type ): string {
 		$response = trim( $response );
 
-		if ( $type === 'multiple_choice' ) {
+		if ( 'multiple_choice' === $type ) {
 			return $this->extract_multiple_choice_answer( $response );
 		}
 
 		// For short answer, return cleaned response.
 		// Remove common prefixes like "Answer:" or "The answer is".
-		$response = preg_replace( '/^(?:the\s+)?answer(?:\s+is)?[:\s]*/i', '', $response );
+		$cleaned = preg_replace( '/^(?:the\s+)?answer(?:\s+is)?[:\s]*/i', '', $response );
 
-		return trim( $response );
+		return trim( $cleaned ?? $response );
 	}
 
 	/**
@@ -160,17 +169,17 @@ class Executor_Knowledge {
 	/**
 	 * Score the answer against the correct answer.
 	 *
-	 * @param string               $model_answer Extracted model answer.
-	 * @param array<string, mixed> $test         Test definition.
+	 * @param string         $model_answer Extracted model answer.
+	 * @param Knowledge_Test $test         Test definition.
 	 *
 	 * @return float Score (0.0 or 1.0).
 	 */
-	private function score_answer( string $model_answer, array $test ): float {
-		$correct     = $test['correct_answer'];
-		$answer_type = $test['answer_type'] ?? 'exact';
+	private function score_answer( string $model_answer, Knowledge_Test $test ): float {
+		$correct     = $test->get_correct_answer();
+		$answer_type = $test->get_answer_type();
 
 		// Multiple choice: simple letter comparison.
-		if ( $test['type'] === 'multiple_choice' ) {
+		if ( $test->is_multiple_choice() ) {
 			return strtoupper( trim( $model_answer ) ) === strtoupper( trim( $correct ) )
 				? 1.0
 				: 0.0;
@@ -220,7 +229,7 @@ class Executor_Knowledge {
 		try {
 			$result = preg_match( $pattern, $model_answer );
 			restore_error_handler();
-			return $result === 1 ? 1.0 : 0.0;
+			return 1 === $result ? 1.0 : 0.0;
 		} catch ( \Throwable $e ) {
 			restore_error_handler();
 			return 0.0;
@@ -248,7 +257,8 @@ class Executor_Knowledge {
 	 */
 	private function normalize_answer( string $answer ): string {
 		// Strip markdown inline code backticks.
-		$answer = preg_replace( '/^`+|`+$/', '', $answer );
+		$stripped = preg_replace( '/^`+|`+$/', '', $answer );
+		$answer   = $stripped ?? $answer;
 
 		// Lowercase.
 		$answer = strtolower( $answer );
@@ -260,8 +270,8 @@ class Executor_Knowledge {
 		$answer = rtrim( $answer, '.,:;!?' );
 
 		// Collapse multiple spaces.
-		$answer = preg_replace( '/\s+/', ' ', $answer );
+		$collapsed = preg_replace( '/\s+/', ' ', $answer );
 
-		return $answer;
+		return $collapsed ?? $answer;
 	}
 }

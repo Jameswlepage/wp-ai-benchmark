@@ -51,8 +51,10 @@ class Judge {
 		string $model,
 		?string $context = null,
 	): array {
-		$prompt          = $this->build_evaluation_prompt( $code, $task, $requirements, $rubric, $context );
-		$response_schema = $rubric['response_schema'] ?? $this->get_default_response_schema( $rubric );
+		$prompt                = $this->build_evaluation_prompt( $code, $task, $requirements, $rubric, $context );
+		$response_schema_value = $rubric['response_schema'] ?? null;
+		/** @var array<string, mixed> $response_schema */
+		$response_schema = is_array( $response_schema_value ) ? $response_schema_value : $this->get_default_response_schema( $rubric );
 
 		try {
 			$response = $this->model_client->generate(
@@ -64,20 +66,33 @@ class Judge {
 
 			// Strip markdown code blocks if present.
 			$json_response = $this->extract_json( $response );
-			$judgment      = json_decode( $json_response, true, 512, JSON_THROW_ON_ERROR );
+			$decoded       = json_decode( $json_response, true, 512, JSON_THROW_ON_ERROR );
+
+			if ( ! is_array( $decoded ) ) {
+				throw new \JsonException( 'Expected JSON object response' );
+			}
+
+			/** @var array<string, mixed> $judgment */
+			$judgment = $decoded;
 
 			// Normalize score to 0-1 range (judge uses 0-5).
-			$raw_score        = (float) ( $judgment['overall_score'] ?? 0 );
+			$raw_score_value  = $judgment['overall_score'] ?? 0;
+			$raw_score        = is_numeric( $raw_score_value ) ? (float) $raw_score_value : 0.0;
 			$normalized_score = min( 1.0, max( 0.0, $raw_score / 5.0 ) );
+
+			$criteria_scores = $judgment['criteria_scores'] ?? [];
+			$summary         = $judgment['summary'] ?? '';
+			$issues          = $judgment['issues'] ?? [];
+			$strengths       = $judgment['strengths'] ?? [];
 
 			return [
 				'score'   => round( $normalized_score, 4 ),
 				'details' => [
 					'raw_score'       => $raw_score,
-					'criteria_scores' => $judgment['criteria_scores'] ?? [],
-					'summary'         => $judgment['summary'] ?? '',
-					'issues'          => $judgment['issues'] ?? [],
-					'strengths'       => $judgment['strengths'] ?? [],
+					'criteria_scores' => is_array( $criteria_scores ) ? $criteria_scores : [],
+					'summary'         => is_string( $summary ) ? $summary : '',
+					'issues'          => is_array( $issues ) ? $issues : [],
+					'strengths'       => is_array( $strengths ) ? $strengths : [],
 				],
 			];
 
@@ -86,7 +101,7 @@ class Judge {
 				'score'   => 0.5, // Neutral on parse failure.
 				'details' => [
 					'error'        => 'Failed to parse judge response: ' . $e->getMessage(),
-					'raw_response' => $response ?? null,
+					'raw_response' => $response,
 				],
 			];
 
@@ -116,14 +131,19 @@ class Judge {
 		array $rubric,
 		?string $context,
 	): string {
-		$system_prompt = $rubric['system_prompt'] ?? $this->get_default_system_prompt();
-		$template      = $rubric['evaluation_prompt_template'] ?? $this->get_default_template();
+		$system_prompt_value = $rubric['system_prompt'] ?? null;
+		$system_prompt       = is_string( $system_prompt_value ) ? $system_prompt_value : $this->get_default_system_prompt();
+		$template_value      = $rubric['evaluation_prompt_template'] ?? null;
+		$template            = is_string( $template_value ) ? $template_value : $this->get_default_template();
 
 		// Build criteria section.
-		$criteria_text = $this->format_criteria( $rubric['criteria'] ?? [] );
+		$criteria_value = $rubric['criteria'] ?? [];
+		/** @var list<array<string, mixed>> $criteria */
+		$criteria      = is_array( $criteria_value ) ? $criteria_value : [];
+		$criteria_text = $this->format_criteria( $criteria );
 
 		// Format requirements.
-		$requirements_text = implode( "\n", array_map( fn( $r ) => "- {$r}", $requirements ) );
+		$requirements_text = implode( "\n", array_map( static fn( $r ) => "- {$r}", $requirements ) );
 
 		// Format context.
 		$context_text = $context ? "\n## Additional Context\n{$context}\n" : '';
@@ -149,17 +169,25 @@ class Judge {
 		$text = '';
 
 		foreach ( $criteria as $criterion ) {
-			$name        = $criterion['name'] ?? $criterion['id'];
-			$weight      = $criterion['weight'] ?? 1.0;
-			$description = $criterion['description'] ?? '';
+			if ( ! is_array( $criterion ) ) {
+				continue;
+			}
+			$name_value        = $criterion['name'] ?? $criterion['id'] ?? 'unknown';
+			$name              = is_string( $name_value ) ? $name_value : 'unknown';
+			$weight_value      = $criterion['weight'] ?? 1.0;
+			$weight            = is_numeric( $weight_value ) ? (float) $weight_value : 1.0;
+			$description_value = $criterion['description'] ?? '';
+			$description       = is_string( $description_value ) ? $description_value : '';
 
 			$text .= "\n### {$name} (weight: {$weight})\n";
 			$text .= "{$description}\n\n";
 
-			if ( ! empty( $criterion['scoring_guide'] ) ) {
+			$scoring_guide = $criterion['scoring_guide'] ?? [];
+			if ( is_array( $scoring_guide ) && ! empty( $scoring_guide ) ) {
 				$text .= "Scoring guide:\n";
-				foreach ( $criterion['scoring_guide'] as $score => $guide ) {
-					$text .= "  {$score}: {$guide}\n";
+				foreach ( $scoring_guide as $score => $guide ) {
+					$guide_str = is_string( $guide ) ? $guide : '';
+					$text     .= "  {$score}: {$guide_str}\n";
 				}
 			}
 
@@ -233,9 +261,15 @@ TEMPLATE;
 	 */
 	private function get_default_response_schema( array $rubric ): array {
 		$criteria_properties = [];
+		$criteria_value      = $rubric['criteria'] ?? [];
+		$criteria            = is_array( $criteria_value ) ? $criteria_value : [];
 
-		foreach ( $rubric['criteria'] ?? [] as $criterion ) {
-			$id                         = $criterion['id'] ?? 'unknown';
+		foreach ( $criteria as $criterion ) {
+			if ( ! is_array( $criterion ) ) {
+				continue;
+			}
+			$id_value                   = $criterion['id'] ?? 'unknown';
+			$id                         = is_string( $id_value ) ? $id_value : 'unknown';
 			$criteria_properties[ $id ] = [
 				'type'       => 'object',
 				'required'   => [ 'score', 'reasoning' ],
@@ -325,12 +359,19 @@ TEMPLATE;
 	 * @return float Weighted average score (0-5).
 	 */
 	public function calculate_weighted_score( array $criteria_scores, array $rubric ): float {
-		$total_weight = 0.0;
-		$weighted_sum = 0.0;
+		$total_weight   = 0.0;
+		$weighted_sum   = 0.0;
+		$criteria_value = $rubric['criteria'] ?? [];
+		$criteria       = is_array( $criteria_value ) ? $criteria_value : [];
 
-		foreach ( $rubric['criteria'] ?? [] as $criterion ) {
-			$id     = $criterion['id'] ?? '';
-			$weight = (float) ( $criterion['weight'] ?? 0 );
+		foreach ( $criteria as $criterion ) {
+			if ( ! is_array( $criterion ) ) {
+				continue;
+			}
+			$id_value     = $criterion['id'] ?? '';
+			$id           = is_string( $id_value ) ? $id_value : '';
+			$weight_value = $criterion['weight'] ?? 0;
+			$weight       = is_numeric( $weight_value ) ? (float) $weight_value : 0.0;
 
 			if ( isset( $criteria_scores[ $id ]['score'] ) ) {
 				$score         = (float) $criteria_scores[ $id ]['score'];

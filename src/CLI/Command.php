@@ -5,10 +5,10 @@
  * @package WordPress\AI_Benchmark
  *
  * @phpstan-type BenchmarkScores array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float}
- * @phpstan-type BenchmarkMetadata array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int}
+ * @phpstan-type BenchmarkMetadata array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int, wp_version: string, php_version: string, benchmark_version: string}
  * @phpstan-type CategoryTypeScore array{score: float, count: int}
  * @phpstan-type CategoryScore array{knowledge: CategoryTypeScore, execution: CategoryTypeScore, total: CategoryTypeScore}
- * @phpstan-type BenchmarkResults array{suite: string, model: string, judge_model: string, runs: int, scores: BenchmarkScores, category_scores: array<string, CategoryScore>, metadata: BenchmarkMetadata, test_results: array<\WordPress\AI_Benchmark\Test_Result>}
+ * @phpstan-type BenchmarkResults array{suite: string, model: string, judge_model: string, runs: int, scores: BenchmarkScores, category_scores: array<string, CategoryScore>, stats: array<string, array{mean: float, stddev: float, min: float, max: float, runs: int}>, metadata: BenchmarkMetadata, test_results: list<Test_Result>}
  */
 
 declare(strict_types=1);
@@ -18,7 +18,7 @@ namespace WordPress\AI_Benchmark\CLI;
 use WordPress\AI_Benchmark\Runner;
 use WordPress\AI_Benchmark\Suite_Loader;
 use WordPress\AI_Benchmark\Model_Client;
-use WordPress\AI_Benchmark\Test_Result;
+use WordPress\AI_Benchmark\Result\Test_Result;
 use WP_CLI;
 use WP_CLI\Utils;
 
@@ -42,11 +42,15 @@ class Command {
 
 	/**
 	 * Suite loader instance.
+	 *
+	 * @var Suite_Loader
 	 */
 	private Suite_Loader $suite_loader;
 
 	/**
 	 * Model client instance.
+	 *
+	 * @var Model_Client
 	 */
 	private Model_Client $model_client;
 
@@ -105,15 +109,18 @@ class Command {
 		$model       = $assoc_args['model'] ?? null;
 		$judge_model = $assoc_args['judge-model'] ?? $model;
 		$runs        = (int) ( $assoc_args['runs'] ?? 1 );
-		$verbose     = Utils\get_flag_value( $assoc_args, 'verbose', false );
+		$verbose     = (bool) Utils\get_flag_value( $assoc_args, 'verbose', false );
 		$format      = $assoc_args['format'] ?? 'table';
-		$skip_judge  = Utils\get_flag_value( $assoc_args, 'skip-judge', false );
+		$skip_judge  = (bool) Utils\get_flag_value( $assoc_args, 'skip-judge', false );
 		$concurrency = (int) ( $assoc_args['concurrency'] ?? 5 );
 
 		// Validate required arguments.
 		if ( ! $suite || ! $model ) {
 			WP_CLI::error( 'Required arguments: --suite and --model' );
 		}
+
+		// $judge_model defaults to $model, so it's guaranteed non-null after validation.
+		$judge_model = $judge_model ?? $model;
 
 		// Validate runs.
 		if ( $runs < 1 ) {
@@ -163,7 +170,7 @@ class Command {
 
 			if ( $verbose ) {
 				$status = $result->has_error() ? 'ERROR' : 'OK';
-				$score  = $type === 'knowledge'
+				$score  = 'knowledge' === $type
 					? $result->get_score()
 					: $result->get_correctness_score();
 
@@ -192,7 +199,7 @@ class Command {
 				concurrency: $concurrency,
 			);
 
-			if ( $format === 'json' ) {
+			if ( 'json' === $format ) {
 				$this->display_json_results( $results );
 			} else {
 				$this->display_table_results( $results, $verbose );
@@ -232,12 +239,12 @@ class Command {
 		}
 
 		$table_data = array_map(
-			fn( $suite ) => [
+			static fn( array $suite ): array => [
 				'name'            => $suite['name'],
 				'types'           => implode( ', ', $suite['types'] ),
 				'knowledge_tests' => $suite['knowledge_count'],
 				'execution_tests' => $suite['execution_count'],
-				'description'     => substr( $suite['description'] ?? '', 0, 50 ),
+				'description'     => substr( $suite['description'], 0, 50 ),
 			],
 			$suites
 		);
@@ -288,6 +295,9 @@ class Command {
 			WP_CLI::error( 'Required: <test-id> and --model' );
 		}
 
+		// $judge_model defaults to $model, so it's guaranteed non-null after validation.
+		$judge_model = $judge_model ?? $model;
+
 		$runner = new Runner(
 			$this->suite_loader,
 			$this->model_client,
@@ -305,7 +315,7 @@ class Command {
 
 			if ( 'json' === $format ) {
 				// Output only JSON for machine parsing (used by parallel runner).
-				WP_CLI::line( wp_json_encode( $result->to_array() ) );
+				WP_CLI::line( $this->json_encode( $result->to_array() ) );
 			} else {
 				$this->display_single_result_detailed( $result );
 			}
@@ -313,7 +323,7 @@ class Command {
 			if ( 'json' === $format ) {
 				// Output error as JSON for machine parsing.
 				WP_CLI::line(
-					wp_json_encode(
+					$this->json_encode(
 						[
 							'test_id' => $test_id,
 							'error'   => $e->getMessage(),
@@ -342,9 +352,10 @@ class Command {
 	 * @when after_wp_load
 	 *
 	 * @param array<int, string>    $args       Positional arguments.
-	 * @param array<string, string> $assoc_args Associative arguments.
+	 * @param array<string, string> $assoc_args Associative arguments (unused).
 	 */
 	public function show_test( array $args, array $assoc_args ): void {
+		unset( $assoc_args ); // Unused but required by WP-CLI signature.
 		$test_id = $args[0] ?? null;
 
 		if ( ! $test_id ) {
@@ -352,14 +363,14 @@ class Command {
 		}
 
 		try {
-			$test = $this->suite_loader->find_test_by_id( $test_id );
+			$test_info = $this->suite_loader->find_test_by_id( $test_id );
 
 			WP_CLI::log( sprintf( 'Test ID: %s', $test_id ) );
-			WP_CLI::log( sprintf( 'Type: %s', $test['type'] ) );
-			WP_CLI::log( sprintf( 'Suite: %s', $test['suite'] ) );
+			WP_CLI::log( sprintf( 'Type: %s', $test_info['type'] ) );
+			WP_CLI::log( sprintf( 'Suite: %s', $test_info['suite'] ) );
 			WP_CLI::log( '' );
 			WP_CLI::log( 'Definition:' );
-			WP_CLI::log( wp_json_encode( $test['data'], JSON_PRETTY_PRINT ) );
+			WP_CLI::log( $this->json_encode( $test_info['test']->to_array(), JSON_PRETTY_PRINT ) );
 
 		} catch ( \Throwable $e ) {
 			WP_CLI::error( $e->getMessage() );
@@ -369,22 +380,27 @@ class Command {
 	/**
 	 * Display results as JSON.
 	 *
-	 * @param array<string, mixed> $results Benchmark results.
+	 * @phpstan-param array{suite: string, model: string, judge_model: string, runs: int, scores: array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float}, category_scores: array<string, array{knowledge: array{score: float, count: int}, execution: array{score: float, count: int}, total: array{score: float, count: int}}>, metadata: array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int, wp_version: string, php_version: string, benchmark_version: string}, test_results: list<Test_Result>} $results
+	 *
+	 * @param array<string, mixed> $results Benchmark results from Runner::run().
 	 */
 	private function display_json_results( array $results ): void {
-		// Convert test results to arrays.
-		$results['test_results'] = array_map(
-			fn( $r ) => $r->to_array(),
+		// Convert test results to arrays for JSON output.
+		$output                 = $results;
+		$output['test_results'] = array_map(
+			static fn( Test_Result $r ): array => $r->to_array(),
 			$results['test_results']
 		);
 
-		WP_CLI::log( wp_json_encode( $results, JSON_PRETTY_PRINT ) );
+		WP_CLI::log( $this->json_encode( $output, JSON_PRETTY_PRINT ) );
 	}
 
 	/**
 	 * Display results as formatted tables.
 	 *
-	 * @param array<string, mixed> $results Benchmark results.
+	 * @phpstan-param array{suite: string, model: string, judge_model: string, runs: int, scores: array{knowledge: float, execution_correctness: float, execution_quality: float, overall: float}, category_scores: array<string, array{knowledge: array{score: float, count: int}, execution: array{score: float, count: int}, total: array{score: float, count: int}}>, metadata: array{duration_seconds: float, total_tests: int, knowledge_tests: int, execution_tests: int, wp_version: string, php_version: string, benchmark_version: string}, test_results: list<Test_Result>} $results
+	 *
+	 * @param array<string, mixed> $results Benchmark results from Runner::run().
 	 * @param bool                 $verbose Show detailed per-test results.
 	 */
 	private function display_table_results( array $results, bool $verbose ): void {
@@ -474,27 +490,26 @@ class Command {
 		$type = $result->get_type();
 
 		if ( $result->has_error() ) {
-			WP_CLI::log( sprintf( '  [%s] ERROR: %s', $id, $result->get_error() ) );
+			WP_CLI::log( sprintf( '  [%s] ERROR: %s', $id, $result->get_error() ?? 'Unknown error' ) );
 			return;
 		}
 
-		if ( $type === 'knowledge' ) {
+		if ( 'knowledge' === $type ) {
 			$score  = $result->get_score();
 			$status = $score >= 1.0 ? 'PASS' : 'FAIL';
 			WP_CLI::log( sprintf( '  [%s] %s - Score: %.2f', $id, $status, $score ) );
 			WP_CLI::log(
 				sprintf(
 					'    Answer: %s (Expected: %s)',
-					$result->get_model_answer(),
-					$result->get_correct_answer()
+					$result->get_model_answer() ?? '',
+					$result->get_correct_answer() ?? ''
 				)
 			);
 		} else {
-			$data = $result->to_array();
 			WP_CLI::log( sprintf( '  [%s]', $id ) );
-			WP_CLI::log( sprintf( '    Static:  %.2f', $data['static_score'] ) );
-			WP_CLI::log( sprintf( '    Runtime: %.2f', $data['runtime_score'] ) );
-			WP_CLI::log( sprintf( '    Quality: %.2f', $data['quality_score'] ) );
+			WP_CLI::log( sprintf( '    Static:  %.2f', $result->get_static_score() ?? 0.0 ) );
+			WP_CLI::log( sprintf( '    Runtime: %.2f', $result->get_runtime_score() ?? 0.0 ) );
+			WP_CLI::log( sprintf( '    Quality: %.2f', $result->get_quality_score() ) );
 		}
 		WP_CLI::log( '' );
 	}
@@ -512,45 +527,46 @@ class Command {
 		WP_CLI::log( '' );
 
 		if ( $result->has_error() ) {
-			WP_CLI::error( sprintf( 'Error: %s', $result->get_error() ), false );
+			WP_CLI::warning( sprintf( 'Error: %s', $result->get_error() ?? 'Unknown error' ) );
 			return;
 		}
 
-		if ( $result->get_type() === 'knowledge' ) {
+		if ( 'knowledge' === $result->get_type() ) {
 			WP_CLI::log( sprintf( 'Score: %.2f', $result->get_score() ) );
-			WP_CLI::log( sprintf( 'Model Answer: %s', $result->get_model_answer() ) );
-			WP_CLI::log( sprintf( 'Correct Answer: %s', $result->get_correct_answer() ) );
+			WP_CLI::log( sprintf( 'Model Answer: %s', $result->get_model_answer() ?? '' ) );
+			WP_CLI::log( sprintf( 'Correct Answer: %s', $result->get_correct_answer() ?? '' ) );
 		} else {
-			$data = $result->to_array();
-
 			WP_CLI::log( 'SCORES:' );
-			WP_CLI::log( sprintf( '  Static Score:      %.4f', $data['static_score'] ) );
-			WP_CLI::log( sprintf( '  Runtime Score:     %.4f', $data['runtime_score'] ) );
-			WP_CLI::log( sprintf( '  Quality Score:     %.4f', $data['quality_score'] ) );
-			WP_CLI::log( sprintf( '  Correctness Score: %.4f', $data['correctness_score'] ) );
+			WP_CLI::log( sprintf( '  Static Score:      %.4f', $result->get_static_score() ?? 0.0 ) );
+			WP_CLI::log( sprintf( '  Runtime Score:     %.4f', $result->get_runtime_score() ?? 0.0 ) );
+			WP_CLI::log( sprintf( '  Quality Score:     %.4f', $result->get_quality_score() ) );
+			WP_CLI::log( sprintf( '  Correctness Score: %.4f', $result->get_correctness_score() ) );
 			WP_CLI::log( '' );
 
 			WP_CLI::log( 'GENERATED CODE:' );
 			WP_CLI::log( '```php' );
-			WP_CLI::log( $result->get_generated_code() );
+			WP_CLI::log( $result->get_generated_code() ?? '' );
 			WP_CLI::log( '```' );
 			WP_CLI::log( '' );
 
-			if ( ! empty( $data['static_details'] ) ) {
+			$static_details = $result->get_static_details();
+			if ( ! empty( $static_details ) ) {
 				WP_CLI::log( 'STATIC CHECK DETAILS:' );
-				WP_CLI::log( wp_json_encode( $data['static_details'], JSON_PRETTY_PRINT ) );
+				WP_CLI::log( $this->json_encode( $static_details, JSON_PRETTY_PRINT ) );
 				WP_CLI::log( '' );
 			}
 
-			if ( ! empty( $data['runtime_details'] ) ) {
+			$runtime_details = $result->get_runtime_details();
+			if ( ! empty( $runtime_details ) ) {
 				WP_CLI::log( 'RUNTIME CHECK DETAILS:' );
-				WP_CLI::log( wp_json_encode( $data['runtime_details'], JSON_PRETTY_PRINT ) );
+				WP_CLI::log( $this->json_encode( $runtime_details, JSON_PRETTY_PRINT ) );
 				WP_CLI::log( '' );
 			}
 
-			if ( ! empty( $data['judge_details'] ) ) {
+			$judge_details = $result->get_judge_details();
+			if ( ! empty( $judge_details ) ) {
 				WP_CLI::log( 'JUDGE EVALUATION:' );
-				WP_CLI::log( wp_json_encode( $data['judge_details'], JSON_PRETTY_PRINT ) );
+				WP_CLI::log( $this->json_encode( $judge_details, JSON_PRETTY_PRINT ) );
 			}
 		}
 	}
@@ -568,5 +584,18 @@ class Command {
 		}
 
 		return sprintf( '%.2f (%d)', $data['score'], $data['count'] );
+	}
+
+	/**
+	 * Encode data as JSON string.
+	 *
+	 * @param mixed $data  Data to encode.
+	 * @param int   $flags JSON encode flags.
+	 *
+	 * @return string JSON string or error message.
+	 */
+	private function json_encode( mixed $data, int $flags = 0 ): string {
+		$json = wp_json_encode( $data, $flags );
+		return false !== $json ? $json : '{"error": "JSON encoding failed"}';
 	}
 }

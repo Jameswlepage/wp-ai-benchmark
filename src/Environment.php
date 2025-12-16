@@ -18,11 +18,6 @@ namespace WordPress\AI_Benchmark;
 class Environment {
 
 	/**
-	 * Default timeout in milliseconds.
-	 */
-	private const DEFAULT_TIMEOUT_MS = 5000;
-
-	/**
 	 * Last error captured by shutdown handler.
 	 *
 	 * @var array{type: int, message: string, file: string, line: int}|null
@@ -38,9 +33,11 @@ class Environment {
 	 * @return array{score: float, details: array<string, mixed>}
 	 */
 	public function execute_and_verify( string $code, array $checks ): array {
-		$setup      = $checks['setup'] ?? '';
-		$teardown   = $checks['teardown'] ?? '';
-		$assertions = $checks['assertions'] ?? [];
+		$setup_value    = $checks['setup'] ?? '';
+		$setup          = is_string( $setup_value ) ? $setup_value : '';
+		$teardown_value = $checks['teardown'] ?? '';
+		$teardown       = is_string( $teardown_value ) ? $teardown_value : '';
+		$assertions     = $checks['assertions'] ?? [];
 
 		$results       = [];
 		$total_weight  = 0.0;
@@ -63,15 +60,21 @@ class Environment {
 			$this->safe_eval( $code );
 
 			// Run assertions.
-			foreach ( $assertions as $assertion ) {
-				$weight        = (float) ( $assertion['weight'] ?? 1.0 );
-				$total_weight += $weight;
+			if ( is_array( $assertions ) ) {
+				foreach ( $assertions as $assertion ) {
+					if ( ! is_array( $assertion ) ) {
+						continue;
+					}
+					$weight_value  = $assertion['weight'] ?? 1.0;
+					$weight        = is_numeric( $weight_value ) ? (float) $weight_value : 1.0;
+					$total_weight += $weight;
 
-				$assertion_result = $this->run_assertion( $assertion );
-				$results[]        = $assertion_result;
+					$assertion_result = $this->run_assertion( $assertion );
+					$results[]        = $assertion_result;
 
-				if ( $assertion_result['passed'] ) {
-					$passed_weight += $weight;
+					if ( $assertion_result['passed'] ) {
+						$passed_weight += $weight;
+					}
 				}
 			}
 		} catch ( \Throwable $e ) {
@@ -89,7 +92,8 @@ class Environment {
 				try {
 					$this->safe_eval( $teardown );
 				} catch ( \Throwable $e ) {
-					// Log but don't fail on teardown errors.
+					// Teardown errors are intentionally ignored to not mask actual test failures.
+					unset( $e );
 				}
 			}
 
@@ -98,7 +102,7 @@ class Environment {
 		}
 
 		// Check for fatal errors captured by shutdown handler.
-		if ( self::$last_fatal_error !== null ) {
+		if ( null !== self::$last_fatal_error ) {
 			$results[] = [
 				'type'        => 'fatal_error',
 				'description' => 'Fatal error during execution',
@@ -127,10 +131,14 @@ class Environment {
 	 * @return array<string, mixed> Assertion result.
 	 */
 	private function run_assertion( array $assertion ): array {
-		$type        = $assertion['type'];
-		$target      = $assertion['target'] ?? null;
-		$expected    = $assertion['expected'] ?? null;
-		$description = $assertion['description'] ?? $type;
+		$type_value        = $assertion['type'] ?? '';
+		$type              = is_string( $type_value ) ? $type_value : '';
+		$target_value      = $assertion['target'] ?? null;
+		$target            = is_string( $target_value ) ? $target_value : '';
+		$expected          = $assertion['expected'] ?? null;
+		$description_value = $assertion['description'] ?? $type;
+		$description       = is_string( $description_value ) ? $description_value : $type;
+		$expected_str      = is_string( $expected ) ? $expected : '';
 
 		$result = [
 			'type'        => $type,
@@ -146,9 +154,9 @@ class Environment {
 				'class_exists'      => $this->assert_class_exists( $target, $result ),
 				'shortcode_exists'  => $this->assert_shortcode_exists( $target, $result ),
 				'hook_registered'   => $this->assert_hook_registered( $target, $assertion, $result ),
-				'output_contains'   => $this->assert_output_contains( $target, $expected, $result ),
-				'output_equals'     => $this->assert_output_equals( $target, $expected, $result ),
-				'output_matches'    => $this->assert_output_matches( $target, $expected, $result ),
+				'output_contains'   => $this->assert_output_contains( $target, $expected_str, $result ),
+				'output_equals'     => $this->assert_output_equals( $target, $expected_str, $result ),
+				'output_matches'    => $this->assert_output_matches( $target, $expected_str, $result ),
 				'returns_value'     => $this->assert_returns_value( $target, $expected, $result ),
 				'query_result'      => $this->assert_query_result( $target, $expected, $result ),
 				'option_value'      => $this->assert_option_value( $target, $expected, $result ),
@@ -166,13 +174,13 @@ class Environment {
 	/**
 	 * Assert that a function exists.
 	 *
-	 * @param string               $function Function name.
-	 * @param array<string, mixed> $result   Base result array.
+	 * @param string               $function_name Function name.
+	 * @param array<string, mixed> $result        Base result array.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function assert_function_exists( string $function, array $result ): array {
-		$result['passed'] = function_exists( $function );
+	private function assert_function_exists( string $function_name, array $result ): array {
+		$result['passed'] = function_exists( $function_name );
 		$result['actual'] = $result['passed'] ? 'exists' : 'not found';
 		return $result;
 	}
@@ -180,13 +188,13 @@ class Environment {
 	/**
 	 * Assert that a class exists.
 	 *
-	 * @param string               $class  Class name.
-	 * @param array<string, mixed> $result Base result array.
+	 * @param string               $class_name Class name.
+	 * @param array<string, mixed> $result     Base result array.
 	 *
 	 * @return array<string, mixed>
 	 */
-	private function assert_class_exists( string $class, array $result ): array {
-		$result['passed'] = class_exists( $class );
+	private function assert_class_exists( string $class_name, array $result ): array {
+		$result['passed'] = class_exists( $class_name );
 		$result['actual'] = $result['passed'] ? 'exists' : 'not found';
 		return $result;
 	}
@@ -217,14 +225,15 @@ class Environment {
 	 */
 	private function assert_hook_registered( string $hook, array $assertion, array $result ): array {
 		global $wp_filter;
-		$callback = $assertion['callback'] ?? null;
+		$callback_value = $assertion['callback'] ?? null;
+		$callback       = is_string( $callback_value ) ? $callback_value : null;
 
 		if ( ! isset( $wp_filter[ $hook ] ) ) {
 			$result['actual'] = 'hook not found';
 			return $result;
 		}
 
-		if ( $callback === null ) {
+		if ( null === $callback ) {
 			$result['passed'] = true;
 			$result['actual'] = 'hook has callbacks';
 			return $result;
@@ -258,6 +267,7 @@ class Environment {
 		ob_start();
 		$this->safe_eval( $code_or_callable );
 		$output = ob_get_clean();
+		$output = false !== $output ? $output : '';
 
 		$result['actual'] = $output;
 		$result['passed'] = str_contains( $output, $expected );
@@ -277,9 +287,10 @@ class Environment {
 		ob_start();
 		$this->safe_eval( $code_or_callable );
 		$output = ob_get_clean();
+		$output = false !== $output ? $output : '';
 
 		$result['actual'] = $output;
-		$result['passed'] = trim( $output ) === trim( $expected );
+		$result['passed'] = trim( $expected ) === trim( $output );
 		return $result;
 	}
 
@@ -296,6 +307,7 @@ class Environment {
 		ob_start();
 		$this->safe_eval( $code_or_callable );
 		$output = ob_get_clean();
+		$output = false !== $output ? $output : '';
 
 		$result['actual'] = $output;
 
@@ -321,7 +333,7 @@ class Environment {
 		$actual = $this->safe_eval( $code_or_callable );
 
 		$result['actual'] = $actual;
-		$result['passed'] = $actual === $expected;
+		$result['passed'] = $expected === $actual;
 		return $result;
 	}
 
@@ -336,10 +348,12 @@ class Environment {
 	 */
 	private function assert_query_result( string $query, mixed $expected, array $result ): array {
 		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared -- Query is from test config.
 		$actual = $wpdb->get_results( $query );
 
 		$result['actual'] = $actual;
-		$result['passed'] = $actual == $expected; // Loose comparison for objects.
+		// phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Loose comparison needed for objects/arrays.
+		$result['passed'] = $expected == $actual;
 		return $result;
 	}
 
@@ -356,7 +370,7 @@ class Environment {
 		$actual = get_option( $option );
 
 		$result['actual'] = $actual;
-		$result['passed'] = $actual === $expected;
+		$result['passed'] = $expected === $actual;
 		return $result;
 	}
 
@@ -369,14 +383,16 @@ class Environment {
 	 * @return array<string, mixed>
 	 */
 	private function assert_post_meta_value( array $assertion, array $result ): array {
-		$post_id  = $assertion['post_id'] ?? 0;
-		$meta_key = $assertion['meta_key'] ?? '';
-		$expected = $assertion['expected'] ?? null;
+		$post_id_value  = $assertion['post_id'] ?? 0;
+		$post_id        = is_int( $post_id_value ) ? $post_id_value : 0;
+		$meta_key_value = $assertion['meta_key'] ?? '';
+		$meta_key       = is_string( $meta_key_value ) ? $meta_key_value : '';
+		$expected       = $assertion['expected'] ?? null;
 
 		$actual = get_post_meta( $post_id, $meta_key, true );
 
 		$result['actual'] = $actual;
-		$result['passed'] = $actual === $expected;
+		$result['passed'] = $expected === $actual;
 		return $result;
 	}
 
@@ -389,8 +405,9 @@ class Environment {
 	 * @return array<string, mixed>
 	 */
 	private function assert_custom( array $assertion, array $result ): array {
-		$code   = $assertion['code'] ?? 'return false;';
-		$actual = $this->safe_eval( $code );
+		$code_value = $assertion['code'] ?? 'return false;';
+		$code       = is_string( $code_value ) ? $code_value : 'return false;';
+		$actual     = $this->safe_eval( $code );
 
 		$result['actual'] = $actual;
 		$result['passed'] = (bool) $actual;
@@ -408,6 +425,7 @@ class Environment {
 		// Strip opening PHP tag if present.
 		$code = preg_replace( '/^<\?php\s*/i', '', $code );
 
+		// phpcs:ignore Squiz.PHP.Eval.Discouraged -- Required for runtime code verification in benchmarks.
 		return eval( $code );
 	}
 
@@ -421,15 +439,15 @@ class Environment {
 	 */
 	private function callback_matches( mixed $registered, string $expected ): bool {
 		if ( is_string( $registered ) ) {
-			return $registered === $expected;
+			return $expected === $registered;
 		}
 
-		if ( is_array( $registered ) && count( $registered ) === 2 ) {
+		if ( is_array( $registered ) && 2 === count( $registered ) ) {
 			$class = is_object( $registered[0] )
 				? get_class( $registered[0] )
 				: $registered[0];
-			return "{$class}::{$registered[1]}" === $expected
-				|| $registered[1] === $expected;
+			return $expected === "{$class}::{$registered[1]}"
+				|| $expected === $registered[1];
 		}
 
 		return false;
@@ -460,12 +478,12 @@ class Environment {
 	 * @param string $errfile Error file.
 	 * @param int    $errline Error line.
 	 *
-	 * @return bool
+	 * @return never Function always throws.
 	 *
-	 * @throws \ErrorException
+	 * @throws \ErrorException Always thrown to convert errors to exceptions.
 	 */
-	public function handle_error( int $errno, string $errstr, string $errfile = '', int $errline = 0 ): bool {
-		// Convert errors to exceptions for consistent handling.
+	public function handle_error( int $errno, string $errstr, string $errfile = '', int $errline = 0 ): never {
+		// phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- ErrorException params, not output.
 		throw new \ErrorException( $errstr, 0, $errno, $errfile, $errline );
 	}
 
@@ -475,7 +493,7 @@ class Environment {
 	public function handle_shutdown(): void {
 		$error = error_get_last();
 
-		if ( $error !== null && in_array( $error['type'], [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ], true ) ) {
+		if ( null !== $error && in_array( $error['type'], [ E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR ], true ) ) {
 			self::$last_fatal_error = $error;
 		}
 	}

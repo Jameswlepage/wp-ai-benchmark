@@ -10,6 +10,9 @@ declare(strict_types=1);
 namespace WordPress\AI_Benchmark;
 
 use Symfony\Component\Process\Process;
+use WordPress\AI_Benchmark\Result\Test_Result;
+use WordPress\AI_Benchmark\Test\Execution_Test;
+use WordPress\AI_Benchmark\Test\Knowledge_Test;
 
 /**
  * Runs benchmark tests in parallel using worker processes.
@@ -29,14 +32,14 @@ class Parallel_Runner {
 	/**
 	 * Pending tests to run.
 	 *
-	 * @var array<array{id: string, type: string}>
+	 * @var array<array{id: string, type: string, category: string}>
 	 */
 	private array $pending = [];
 
 	/**
 	 * Currently running processes.
 	 *
-	 * @var array<string, array{process: Process, test_id: string, type: string}>
+	 * @var array<string, array{process: Process, test_id: string, type: string, category: string}>
 	 */
 	private array $running = [];
 
@@ -87,12 +90,12 @@ class Parallel_Runner {
 	/**
 	 * Run tests in parallel.
 	 *
-	 * @param array<array<string, mixed>> $knowledge_tests Knowledge test definitions.
-	 * @param array<array<string, mixed>> $execution_tests Execution test definitions.
-	 * @param string                      $model           Model to benchmark.
-	 * @param string                      $judge_model     Judge model for execution tests.
-	 * @param int                         $run_number      Current run number.
-	 * @param callable|null               $progress_callback Called after each test completes.
+	 * @param array<Knowledge_Test> $knowledge_tests Knowledge test definitions.
+	 * @param array<Execution_Test> $execution_tests Execution test definitions.
+	 * @param string                $model           Model to benchmark.
+	 * @param string                $judge_model     Judge model for execution tests.
+	 * @param int                   $run_number      Current run number.
+	 * @param callable|null         $progress_callback Called after each test completes.
 	 *
 	 * @return array<Test_Result> Test results.
 	 */
@@ -115,16 +118,16 @@ class Parallel_Runner {
 		$this->pending = [];
 		foreach ( $knowledge_tests as $test ) {
 			$this->pending[] = [
-				'id'       => $test['id'],
+				'id'       => $test->get_id(),
 				'type'     => 'knowledge',
-				'category' => $test['category'] ?? '',
+				'category' => $test->get_category(),
 			];
 		}
 		foreach ( $execution_tests as $test ) {
 			$this->pending[] = [
-				'id'       => $test['id'],
+				'id'       => $test->get_id(),
 				'type'     => 'execution',
-				'category' => $test['category'] ?? '',
+				'category' => $test->get_category(),
 			];
 		}
 
@@ -231,18 +234,18 @@ class Parallel_Runner {
 				! empty( $stderr ) ? $stderr : '(empty)',
 				! empty( $output ) ? substr( $output, 0, 500 ) : '(empty)'
 			);
-			return Test_Result::error_result( $test_id, $type, $error, $category );
+			return Test_Result::error_result_from_string( $test_id, $type, $error, $category );
 		}
 
 		// Parse JSON output.
 		if ( empty( $output ) ) {
-			return Test_Result::error_result( $test_id, $type, 'Empty output from worker', $category );
+			return Test_Result::error_result_from_string( $test_id, $type, 'Empty output from worker', $category );
 		}
 
 		try {
-			$data = json_decode( $output, true, 512, JSON_THROW_ON_ERROR );
+			$decoded = json_decode( $output, true, 512, JSON_THROW_ON_ERROR );
 		} catch ( \JsonException $e ) {
-			return Test_Result::error_result(
+			return Test_Result::error_result_from_string(
 				$test_id,
 				$type,
 				'Failed to parse JSON: ' . $e->getMessage() . ' - Output: ' . substr( $output, 0, 200 ),
@@ -250,9 +253,17 @@ class Parallel_Runner {
 			);
 		}
 
+		if ( ! is_array( $decoded ) ) {
+			return Test_Result::error_result_from_string( $test_id, $type, 'Invalid JSON response: expected array', $category );
+		}
+
+		/** @var array<string, mixed> $data */
+		$data = $decoded;
+
 		// Check for error in JSON response.
 		if ( isset( $data['error'] ) && ! isset( $data['type'] ) ) {
-			return Test_Result::error_result( $test_id, $type, $data['error'], $category );
+			$error_msg = is_string( $data['error'] ) ? $data['error'] : 'Unknown error';
+			return Test_Result::error_result_from_string( $test_id, $type, $error_msg, $category );
 		}
 
 		// Reconstruct Test_Result from JSON data.
@@ -267,38 +278,62 @@ class Parallel_Runner {
 	 * @return Test_Result
 	 */
 	private function array_to_result( array $data ): Test_Result {
-		$test_id  = $data['test_id'] ?? '';
-		$type     = $data['type'] ?? 'unknown';
-		$category = $data['category'] ?? '';
+		$test_id_value = $data['test_id'] ?? '';
+		$test_id       = is_string( $test_id_value ) ? $test_id_value : '';
+
+		$type_value = $data['type'] ?? 'unknown';
+		$type       = is_string( $type_value ) ? $type_value : 'unknown';
+
+		$category_value = $data['category'] ?? '';
+		$category       = is_string( $category_value ) ? $category_value : '';
 
 		// Check for error.
 		if ( ! empty( $data['error'] ) ) {
-			return Test_Result::error_result( $test_id, $type, $data['error'], $category );
+			$error_msg = is_string( $data['error'] ) ? $data['error'] : 'Unknown error';
+			return Test_Result::error_result_from_string( $test_id, $type, $error_msg, $category );
 		}
 
 		if ( 'knowledge' === $type ) {
+			$score_value          = $data['score'] ?? 0.0;
+			$model_answer_value   = $data['model_answer'] ?? '';
+			$correct_answer_value = $data['correct_answer'] ?? '';
+
 			$result = Test_Result::knowledge_result(
 				$test_id,
-				(float) ( $data['score'] ?? 0.0 ),
-				(string) ( $data['model_answer'] ?? '' ),
-				(string) ( $data['correct_answer'] ?? '' ),
+				is_numeric( $score_value ) ? (float) $score_value : 0.0,
+				is_string( $model_answer_value ) ? $model_answer_value : '',
+				is_string( $correct_answer_value ) ? $correct_answer_value : '',
 				$category
 			);
 		} else {
+			$generated_code_value = $data['generated_code'] ?? '';
+			$static_score_value   = $data['static_score'] ?? 0.0;
+			$runtime_score_value  = $data['runtime_score'] ?? 0.0;
+			$quality_score_value  = $data['quality_score'] ?? 0.0;
+
+			/** @var array<string, mixed> $static_details */
+			$static_details = isset( $data['static_details'] ) && is_array( $data['static_details'] ) ? $data['static_details'] : [];
+
+			/** @var array<string, mixed> $runtime_details */
+			$runtime_details = isset( $data['runtime_details'] ) && is_array( $data['runtime_details'] ) ? $data['runtime_details'] : [];
+
+			/** @var array<string, mixed> $judge_details */
+			$judge_details = isset( $data['judge_details'] ) && is_array( $data['judge_details'] ) ? $data['judge_details'] : [];
+
 			$result = Test_Result::execution_result(
 				$test_id,
-				(string) ( $data['generated_code'] ?? '' ),
-				(float) ( $data['static_score'] ?? 0.0 ),
-				(float) ( $data['runtime_score'] ?? 0.0 ),
-				(float) ( $data['quality_score'] ?? 0.0 ),
-				$data['static_details'] ?? [],
-				$data['runtime_details'] ?? [],
-				$data['judge_details'] ?? [],
+				is_string( $generated_code_value ) ? $generated_code_value : '',
+				is_numeric( $static_score_value ) ? (float) $static_score_value : 0.0,
+				is_numeric( $runtime_score_value ) ? (float) $runtime_score_value : 0.0,
+				is_numeric( $quality_score_value ) ? (float) $quality_score_value : 0.0,
+				$static_details,
+				$runtime_details,
+				$judge_details,
 				$category
 			);
 		}
 
-		if ( isset( $data['duration_ms'] ) ) {
+		if ( isset( $data['duration_ms'] ) && is_numeric( $data['duration_ms'] ) ) {
 			$result->set_duration_ms( (float) $data['duration_ms'] );
 		}
 

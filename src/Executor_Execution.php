@@ -9,6 +9,10 @@ declare(strict_types=1);
 
 namespace WordPress\AI_Benchmark;
 
+use WordPress\AI_Benchmark\Result\Test_Result;
+use WordPress\AI_Benchmark\Test\Execution_Test;
+use WordPress\AI_Benchmark\Test\Enum\Test_Type;
+
 /**
  * Executes HumanEval-style code generation tests with three-layer evaluation.
  *
@@ -20,26 +24,36 @@ class Executor_Execution {
 
 	/**
 	 * Model client for AI requests.
+	 *
+	 * @var Model_Client
 	 */
 	private Model_Client $model_client;
 
 	/**
 	 * Static code checker.
+	 *
+	 * @var Static_Checker
 	 */
 	private Static_Checker $static_checker;
 
 	/**
 	 * Runtime environment.
+	 *
+	 * @var Environment
 	 */
 	private Environment $environment;
 
 	/**
 	 * AI judge for quality evaluation.
+	 *
+	 * @var Judge
 	 */
 	private Judge $judge;
 
 	/**
 	 * Suite loader for rubrics.
+	 *
+	 * @var Suite_Loader
 	 */
 	private Suite_Loader $suite_loader;
 
@@ -69,13 +83,13 @@ class Executor_Execution {
 	/**
 	 * Execute an execution test with three-layer evaluation.
 	 *
-	 * @param array<string, mixed> $test        Test definition.
-	 * @param string               $model       Model identifier for code generation.
-	 * @param string               $judge_model Model identifier for judge evaluation.
+	 * @param Execution_Test $test        Test definition.
+	 * @param string         $model       Model identifier for code generation.
+	 * @param string         $judge_model Model identifier for judge evaluation.
 	 *
 	 * @return Test_Result
 	 */
-	public function execute( array $test, string $model, string $judge_model ): Test_Result {
+	public function execute( Execution_Test $test, string $model, string $judge_model ): Test_Result {
 		$start = microtime( true );
 
 		try {
@@ -91,10 +105,10 @@ class Executor_Execution {
 
 			if ( empty( $code ) ) {
 				$result = Test_Result::error_result(
-					test_id: $test['id'],
-					type: 'execution',
+					test_id: $test->get_id(),
+					type: Test_Type::EXECUTION,
 					error: 'No code extracted from model response',
-					category: $test['category'] ?? '',
+					category: $test->get_category(),
 				);
 				$result->set_duration_ms( ( microtime( true ) - $start ) * 1000 );
 				return $result;
@@ -110,7 +124,7 @@ class Executor_Execution {
 			$judge_result = $this->run_judge_evaluation( $code, $test, $judge_model );
 
 			$result = Test_Result::execution_result(
-				test_id: $test['id'],
+				test_id: $test->get_id(),
 				generated_code: $code,
 				static_score: $static_result['score'],
 				runtime_score: $runtime_result['score'],
@@ -118,15 +132,15 @@ class Executor_Execution {
 				static_details: $static_result['details'],
 				runtime_details: $runtime_result['details'],
 				judge_details: $judge_result['details'],
-				category: $test['category'] ?? '',
+				category: $test->get_category(),
 			);
 
 		} catch ( \Throwable $e ) {
 			$result = Test_Result::error_result(
-				test_id: $test['id'],
-				type: 'execution',
+				test_id: $test->get_id(),
+				type: Test_Type::EXECUTION,
 				error: $e->getMessage(),
-				category: $test['category'] ?? '',
+				category: $test->get_category(),
 			);
 		}
 
@@ -138,22 +152,24 @@ class Executor_Execution {
 	/**
 	 * Build the prompt for code generation.
 	 *
-	 * @param array<string, mixed> $test Test definition.
+	 * @param Execution_Test $test Test definition.
 	 *
 	 * @return string Complete prompt.
 	 */
-	private function build_prompt( array $test ): string {
-		$prompt = 'You are an expert WordPress developer. ' . $test['prompt'];
+	private function build_prompt( Execution_Test $test ): string {
+		$prompt = 'You are an expert WordPress developer. ' . $test->get_prompt();
 
-		if ( ! empty( $test['requirements'] ) ) {
+		$requirements = $test->get_requirements();
+		if ( ! empty( $requirements ) ) {
 			$prompt .= "\n\nRequirements:\n";
-			foreach ( $test['requirements'] as $req ) {
+			foreach ( $requirements as $req ) {
 				$prompt .= "- {$req}\n";
 			}
 		}
 
-		if ( ! empty( $test['context']['existing_code'] ) ) {
-			$prompt .= "\n\nExisting code context:\n```php\n{$test['context']['existing_code']}\n```";
+		$existing_code = $test->get_existing_code();
+		if ( null !== $existing_code ) {
+			$prompt .= "\n\nExisting code context:\n```php\n{$existing_code}\n```";
 		}
 
 		$prompt .= "\n\nProvide only the PHP code solution. Wrap your code in ```php code blocks. Do not include explanations.";
@@ -201,15 +217,15 @@ class Executor_Execution {
 	/**
 	 * Run static code checks.
 	 *
-	 * @param string               $code Generated code.
-	 * @param array<string, mixed> $test Test definition.
+	 * @param string         $code Generated code.
+	 * @param Execution_Test $test Test definition.
 	 *
 	 * @return array{score: float, details: array<string, mixed>}
 	 */
-	private function run_static_checks( string $code, array $test ): array {
-		$checks = $test['static_checks'] ?? [];
+	private function run_static_checks( string $code, Execution_Test $test ): array {
+		$checks = $test->get_static_checks();
 
-		if ( empty( $checks ) ) {
+		if ( ! $test->has_static_checks() || null === $checks ) {
 			return [
 				'score'   => 1.0,
 				'details' => [ 'message' => 'No static checks defined' ],
@@ -222,15 +238,15 @@ class Executor_Execution {
 	/**
 	 * Run runtime verification checks.
 	 *
-	 * @param string               $code Generated code.
-	 * @param array<string, mixed> $test Test definition.
+	 * @param string         $code Generated code.
+	 * @param Execution_Test $test Test definition.
 	 *
 	 * @return array{score: float, details: array<string, mixed>}
 	 */
-	private function run_runtime_checks( string $code, array $test ): array {
-		$checks = $test['runtime_checks'] ?? [];
+	private function run_runtime_checks( string $code, Execution_Test $test ): array {
+		$checks = $test->get_runtime_checks();
 
-		if ( empty( $checks ) || empty( $checks['assertions'] ) ) {
+		if ( ! $test->has_runtime_checks() || null === $checks ) {
 			return [
 				'score'   => 1.0,
 				'details' => [ 'message' => 'No runtime checks defined' ],
@@ -243,24 +259,22 @@ class Executor_Execution {
 	/**
 	 * Run AI judge quality evaluation.
 	 *
-	 * @param string               $code        Generated code.
-	 * @param array<string, mixed> $test        Test definition.
-	 * @param string               $judge_model Judge model identifier.
+	 * @param string         $code        Generated code.
+	 * @param Execution_Test $test        Test definition.
+	 * @param string         $judge_model Judge model identifier.
 	 *
 	 * @return array{score: float, details: array<string, mixed>}
 	 */
-	private function run_judge_evaluation( string $code, array $test, string $judge_model ): array {
-		$judge_config = $test['judge_config'] ?? [];
-
+	private function run_judge_evaluation( string $code, Execution_Test $test, string $judge_model ): array {
 		// Check if judging is disabled for this test.
-		if ( isset( $judge_config['enabled'] ) && $judge_config['enabled'] === false ) {
+		if ( ! $test->is_judge_enabled() ) {
 			return [
 				'score'   => 0.5, // Neutral score.
 				'details' => [ 'message' => 'Judge evaluation disabled for this test' ],
 			];
 		}
 
-		$rubric_id = $judge_config['rubric_id'] ?? 'wp-judge-rubric-v1';
+		$rubric_id = $test->get_rubric_id();
 
 		try {
 			$rubric = $this->suite_loader->load_rubric( $rubric_id );
@@ -272,23 +286,26 @@ class Executor_Execution {
 		}
 
 		// Apply any criterion weight overrides from test config.
-		if ( ! empty( $judge_config['criteria_weights'] ) ) {
-			foreach ( $rubric['criteria'] as &$criterion ) {
+		$judge_config     = $test->get_judge_config();
+		$criteria_weights = $judge_config['criteria_weights'] ?? null;
+		if ( null !== $judge_config && is_array( $criteria_weights ) && ! empty( $criteria_weights ) && isset( $rubric['criteria'] ) && is_array( $rubric['criteria'] ) ) {
+			/** @var array<int, array{id?: string, weight?: float}> $criteria */
+			$criteria = $rubric['criteria'];
+			foreach ( $criteria as $index => $criterion ) {
 				$id = $criterion['id'] ?? '';
-				if ( isset( $judge_config['criteria_weights'][ $id ] ) ) {
-					$criterion['weight'] = $judge_config['criteria_weights'][ $id ];
+				if ( isset( $criteria_weights[ $id ] ) ) {
+					$rubric['criteria'][ $index ]['weight'] = $criteria_weights[ $id ];
 				}
 			}
-			unset( $criterion );
 		}
 
 		return $this->judge->evaluate(
 			code: $code,
-			task: $test['prompt'],
-			requirements: $test['requirements'] ?? [],
+			task: $test->get_prompt(),
+			requirements: $test->get_requirements(),
 			rubric: $rubric,
 			model: $judge_model,
-			context: $judge_config['context_for_judge'] ?? null,
+			context: $test->get_judge_context(),
 		);
 	}
 
@@ -297,12 +314,12 @@ class Executor_Execution {
 	 *
 	 * Useful for faster iteration during development.
 	 *
-	 * @param array<string, mixed> $test  Test definition.
-	 * @param string               $model Model identifier.
+	 * @param Execution_Test $test  Test definition.
+	 * @param string         $model Model identifier.
 	 *
 	 * @return Test_Result
 	 */
-	public function execute_without_judge( array $test, string $model ): Test_Result {
+	public function execute_without_judge( Execution_Test $test, string $model ): Test_Result {
 		$start = microtime( true );
 
 		try {
@@ -317,10 +334,10 @@ class Executor_Execution {
 
 			if ( empty( $code ) ) {
 				$result = Test_Result::error_result(
-					test_id: $test['id'],
-					type: 'execution',
+					test_id: $test->get_id(),
+					type: Test_Type::EXECUTION,
 					error: 'No code extracted from model response',
-					category: $test['category'] ?? '',
+					category: $test->get_category(),
 				);
 				$result->set_duration_ms( ( microtime( true ) - $start ) * 1000 );
 				return $result;
@@ -330,7 +347,7 @@ class Executor_Execution {
 			$runtime_result = $this->run_runtime_checks( $code, $test );
 
 			$result = Test_Result::execution_result(
-				test_id: $test['id'],
+				test_id: $test->get_id(),
 				generated_code: $code,
 				static_score: $static_result['score'],
 				runtime_score: $runtime_result['score'],
@@ -338,15 +355,15 @@ class Executor_Execution {
 				static_details: $static_result['details'],
 				runtime_details: $runtime_result['details'],
 				judge_details: [ 'message' => 'Judge evaluation skipped' ],
-				category: $test['category'] ?? '',
+				category: $test->get_category(),
 			);
 
 		} catch ( \Throwable $e ) {
 			$result = Test_Result::error_result(
-				test_id: $test['id'],
-				type: 'execution',
+				test_id: $test->get_id(),
+				type: Test_Type::EXECUTION,
 				error: $e->getMessage(),
-				category: $test['category'] ?? '',
+				category: $test->get_category(),
 			);
 		}
 
