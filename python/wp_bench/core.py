@@ -1,6 +1,8 @@
 """Main orchestration loop for WP-Bench."""
 from __future__ import annotations
 
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Dict, List
 
 import orjson
@@ -16,6 +18,12 @@ from .scoring import ScoreAggregator
 from .utils import ensure_dir, sha256, strip_code_fences
 
 console = Console()
+
+
+def _timestamped_path(path: Path) -> Path:
+    """Add timestamp to filename: results.json -> results_20231216_143052.json"""
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return path.parent / f"{path.stem}_{timestamp}{path.suffix}"
 
 
 class BenchmarkRunner:
@@ -132,11 +140,14 @@ class BenchmarkRunner:
         return round(passed / len(assertions), 4)
 
     def _write_outputs(self, payload: Dict[str, Any]) -> None:
-        ensure_dir(self.config.output.path.parent)
-        self.config.output.path.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
+        output_path = _timestamped_path(self.config.output.path)
+        ensure_dir(output_path.parent)
+        output_path.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
+        console.print(f"Results written to: {output_path}")
         if self.config.output.jsonl_path:
-            ensure_dir(self.config.output.jsonl_path.parent)
-            with self.config.output.jsonl_path.open("w", encoding="utf-8") as handle:
+            jsonl_path = _timestamped_path(self.config.output.jsonl_path)
+            ensure_dir(jsonl_path.parent)
+            with jsonl_path.open("w", encoding="utf-8") as handle:
                 for record in self.records:
                     handle.write(orjson.dumps(record).decode("utf-8"))
                     handle.write("\n")
@@ -211,8 +222,10 @@ class MultiModelRunner:
                 for name, result in self.results.items()
             },
         }
-        ensure_dir(self.config.output.path.parent)
-        self.config.output.path.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
+        output_path = _timestamped_path(self.config.output.path)
+        ensure_dir(output_path.parent)
+        output_path.write_bytes(orjson.dumps(payload, option=orjson.OPT_INDENT_2))
+        console.print(f"Results written to: {output_path}")
 
 
 class SingleModelRunner:
