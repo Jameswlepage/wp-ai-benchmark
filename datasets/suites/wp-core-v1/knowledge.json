@@ -590,6 +590,134 @@
       "correct_answer": "B",
       "explanation": "Block hooks run in layout contexts (templates, template parts, patterns, navigation posts), not inside post content.",
       "references": ["https://make.wordpress.org/core/2023/10/15/introducing-block-hooks-for-dynamic-blocks/"]
+    },
+    {
+      "id": "k-html-script-reject-001",
+      "category": "html_api",
+      "difficulty": "hard",
+      "prompt": "What does WP_HTML_Tag_Processor::set_modifiable_text() do when you try to set script contents that include '<script' or '</script' in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Silently escapes the angle brackets" },
+        { "key": "B", "text": "Throws a fatal error" },
+        { "key": "C", "text": "Returns false and leaves the SCRIPT tag unchanged" },
+        { "key": "D", "text": "Strips the nested script tags and proceeds" }
+      ],
+      "correct_answer": "C",
+      "explanation": "6.9 hardens set_modifiable_text() for SCRIPT nodes by rejecting updates containing '<script' or '</script', returning false so callers can abort safely.",
+      "references": ["https://make.wordpress.org/core/2025/11/21/updates-to-the-html-api-in-6-9/"]
+    },
+    {
+      "id": "k-dataviews-readonly-001",
+      "category": "dataviews",
+      "difficulty": "hard",
+      "prompt": "Which property marks a DataViews field as display-only in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "locked" },
+        { "key": "B", "text": "readOnly" },
+        { "key": "C", "text": "editable:false" },
+        { "key": "D", "text": "viewOnly" }
+      ],
+      "correct_answer": "B",
+      "explanation": "DataViews fields accept readOnly:true to render a non-editable value while still showing in the UI.",
+      "references": ["https://make.wordpress.org/core/2025/11/11/dataviews-dataform-et-al-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-dataviews-getelements-001",
+      "category": "dataviews",
+      "difficulty": "hard",
+      "prompt": "What does the new getElements() hook in DataViews 6.9 do?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Groups table rows by a field" },
+        { "key": "B", "text": "Fetches filter option values lazily on demand" },
+        { "key": "C", "text": "Locks filters from user edits" },
+        { "key": "D", "text": "Persists user layouts to theme.json" }
+      ],
+      "correct_answer": "B",
+      "explanation": "getElements returns options asynchronously when a user opens a filter/edit control, avoiding upfront fetches.",
+      "references": ["https://make.wordpress.org/core/2025/11/11/dataviews-dataform-et-al-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-interactivity-router-attr-001",
+      "category": "interactivity_api",
+      "difficulty": "hard",
+      "prompt": "After marking a script module as client-navigation compatible in 6.9, what attribute appears on its script tag?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "data-wp-interactive" },
+        { "key": "B", "text": "data-wp-router-options='{\"loadOnClientNavigation\":true}'" },
+        { "key": "C", "text": "data-wp-client-nav" },
+        { "key": "D", "text": "type=\"module/nav\"" }
+      ],
+      "correct_answer": "B",
+      "explanation": "add_client_navigation_support_to_script_module injects data-wp-router-options with loadOnClientNavigation true so the router imports the module on SPA transitions.",
+      "references": ["https://make.wordpress.org/core/2025/11/12/interactivity-apis-client-navigation-improvements-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-html-script-reject-001",
+      "category": "html_api",
+      "difficulty": "hard",
+      "prompt": "What does WP_HTML_Tag_Processor::set_modifiable_text() do when you try to set SCRIPT contents that include '<script' or '</script' in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Silently escapes the angle brackets" },
+        { "key": "B", "text": "Throws a fatal error" },
+        { "key": "C", "text": "Returns false and leaves the SCRIPT tag unchanged" },
+        { "key": "D", "text": "Strips the nested script tags and proceeds" }
+      ],
+      "correct_answer": "C",
+      "explanation": "6.9 hardens set_modifiable_text() for SCRIPT nodes by rejecting updates containing '<script' or '</script', returning false so callers can abort safely.",
+      "references": ["https://make.wordpress.org/core/2025/11/21/updates-to-the-html-api-in-6-9/"]
+    },
+    {
+      "id": "k-dataviews-readonly-001",
+      "category": "dataviews",
+      "difficulty": "hard",
+      "prompt": "Which property marks a DataViews field as display-only in WordPress 6.9?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "locked" },
+        { "key": "B", "text": "readOnly" },
+        { "key": "C", "text": "editable:false" },
+        { "key": "D", "text": "viewOnly" }
+      ],
+      "correct_answer": "B",
+      "explanation": "DataViews fields accept readOnly:true to render a non-editable value while still showing in the UI.",
+      "references": ["https://make.wordpress.org/core/2025/11/11/dataviews-dataform-et-al-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-dataviews-getelements-001",
+      "category": "dataviews",
+      "difficulty": "hard",
+      "prompt": "What does the new getElements() hook in DataViews 6.9 do?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "Groups table rows by a field" },
+        { "key": "B", "text": "Fetches filter option values lazily on demand" },
+        { "key": "C", "text": "Locks filters from user edits" },
+        { "key": "D", "text": "Persists user layouts to theme.json" }
+      ],
+      "correct_answer": "B",
+      "explanation": "getElements returns options asynchronously when a user opens a filter/edit control, avoiding upfront fetches.",
+      "references": ["https://make.wordpress.org/core/2025/11/11/dataviews-dataform-et-al-in-wordpress-6-9/"]
+    },
+    {
+      "id": "k-utf8-fallback-001",
+      "category": "internationalization",
+      "difficulty": "hard",
+      "prompt": "How does WordPress 6.9 handle UTF-8 detection when the hosting environment lacks mbstring or iconv?",
+      "type": "multiple_choice",
+      "choices": [
+        { "key": "A", "text": "It falls back to ISO-8859-1" },
+        { "key": "B", "text": "It loads a new PHP-based UTF-8 detection pipeline bundled with core" },
+        { "key": "C", "text": "It disables all non-ASCII content" },
+        { "key": "D", "text": "It calls out to an external ICU service" }
+      ],
+      "correct_answer": "B",
+      "explanation": "6.9 ships a self-contained UTF-8 detection/handling layer in PHP so WordPress can reliably process UTF-8 even without mbstring or iconv.",
+      "references": ["https://make.wordpress.org/core/2025/11/25/wordpress-6-9-field-guide/"]
     }
   ]
 }
