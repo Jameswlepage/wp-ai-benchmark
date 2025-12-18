@@ -30,7 +30,7 @@ class ModelConfig(BaseModel):
     temperature: float = 0.0
     max_tokens: Optional[int] = None
     top_p: Optional[float] = None
-    request_timeout: float = 60.0
+    request_timeout: float = 300.0
 
     @validator("temperature")
     def _clamp_temperature(cls, value: float) -> float:
